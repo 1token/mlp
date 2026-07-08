@@ -1,0 +1,106 @@
+{
+  "vector": "TV-002",
+  "description": "Negotiation transcript for the TV-001 dispatch: Tier-2 first-contact verdict (accepted, media deferred pending recipient acceptance), then the upgrade verdict carrying a Reservation. Issuer SN key = RFC 8032 Ed25519 TEST 3.",
+  "issuer_key": {
+    "seed_hex": "c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7",
+    "public_hex": "fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025",
+    "key": "b5ua7yuonrzrbrindrwsh5uacgdyfqcaw5uj3umydvro6xeivjciiaji",
+    "kid": "bdyqdn2sf4ms6wvldnq7ieuwkd6lmzk4kk7esux3od27t5v73arcinga"
+  },
+  "target_domain_document": {
+    "domain": "target.example",
+    "mlp": [
+      "0.1"
+    ],
+    "sn": "https://mlp.target.example/sn",
+    "keys": [
+      {
+        "kid": "bdyqdn2sf4ms6wvldnq7ieuwkd6lmzk4kk7esux3od27t5v73arcinga",
+        "alg": "ed25519",
+        "key": "b5ua7yuonrzrbrindrwsh5uacgdyfqcaw5uj3umydvro6xeivjciiaji",
+        "roles": [
+          "sn",
+          "bs"
+        ]
+      }
+    ]
+  },
+  "verdict_1_sig_input_jcs": "{\"mlp_sig\":\"verdict/1\",\"payload\":{\"created\":\"2026-07-04T10:00:06Z\",\"envelope_id\":\"019f2c92-2c88-7c16-a1fe-4548abf07edd\",\"envelope_origin\":\"origin.example\",\"issuer\":\"target.example\",\"media\":[{\"reason\":\"pending-acceptance\",\"urn\":\"urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y\",\"verdict\":\"defer\"}],\"message\":\"accepted\",\"mlp\":\"0.1\",\"recipients\":[{\"addr\":\"novak@target.example\",\"verdict\":\"accepted\"}],\"verdict_id\":\"019f2c92-3070-7d18-adda-f5b677a35e4a\"},\"protected\":{\"alg\":\"ed25519\",\"created\":\"2026-07-04T10:00:06Z\",\"kid\":\"bdyqdn2sf4ms6wvldnq7ieuwkd6lmzk4kk7esux3od27t5v73arcinga\"}}",
+  "signed_verdict_1": {
+    "payload": {
+      "mlp": "0.1",
+      "verdict_id": "019f2c92-3070-7d18-adda-f5b677a35e4a",
+      "created": "2026-07-04T10:00:06Z",
+      "issuer": "target.example",
+      "envelope_origin": "origin.example",
+      "envelope_id": "019f2c92-2c88-7c16-a1fe-4548abf07edd",
+      "message": "accepted",
+      "recipients": [
+        {
+          "addr": "novak@target.example",
+          "verdict": "accepted"
+        }
+      ],
+      "media": [
+        {
+          "urn": "urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y",
+          "verdict": "defer",
+          "reason": "pending-acceptance"
+        }
+      ]
+    },
+    "signature": {
+      "mlp_sig": "verdict/1",
+      "protected": {
+        "kid": "bdyqdn2sf4ms6wvldnq7ieuwkd6lmzk4kk7esux3od27t5v73arcinga",
+        "alg": "ed25519",
+        "created": "2026-07-04T10:00:06Z"
+      },
+      "value": "MffmU5sreo-2sW5Bwi-EgWq56-wrg4CX-rPxYNMRgKM_1MC_jp1Qhq0wWmFJsYwlDOFEOjfBWd55P2SRVYp2BA"
+    }
+  },
+  "verdict_2_sig_input_jcs": "{\"mlp_sig\":\"verdict/1\",\"payload\":{\"created\":\"2026-07-04T12:30:00Z\",\"envelope_id\":\"019f2c92-2c88-7c16-a1fe-4548abf07edd\",\"envelope_origin\":\"origin.example\",\"issuer\":\"target.example\",\"media\":[{\"reservation\":{\"expires\":\"2026-07-07T12:30:00Z\",\"max_size\":36,\"target_url\":\"https://bs.target.example/ingest/24c372e9a5a3c559\",\"token\":\"Yam_b2ATZeRdhaofjfPPEasHKNDlGBAB\",\"urn\":\"urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y\"},\"urn\":\"urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y\",\"verdict\":\"grant\"}],\"message\":\"accepted\",\"mlp\":\"0.1\",\"recipients\":[{\"addr\":\"novak@target.example\",\"verdict\":\"accepted\"}],\"verdict_id\":\"019f2d1b-6d40-7dae-a190-9b835c6df3f6\"},\"protected\":{\"alg\":\"ed25519\",\"created\":\"2026-07-04T12:30:00Z\",\"kid\":\"bdyqdn2sf4ms6wvldnq7ieuwkd6lmzk4kk7esux3od27t5v73arcinga\"}}",
+  "signed_verdict_2": {
+    "payload": {
+      "mlp": "0.1",
+      "verdict_id": "019f2d1b-6d40-7dae-a190-9b835c6df3f6",
+      "created": "2026-07-04T12:30:00Z",
+      "issuer": "target.example",
+      "envelope_origin": "origin.example",
+      "envelope_id": "019f2c92-2c88-7c16-a1fe-4548abf07edd",
+      "message": "accepted",
+      "recipients": [
+        {
+          "addr": "novak@target.example",
+          "verdict": "accepted"
+        }
+      ],
+      "media": [
+        {
+          "urn": "urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y",
+          "verdict": "grant",
+          "reservation": {
+            "urn": "urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y",
+            "max_size": 36,
+            "target_url": "https://bs.target.example/ingest/24c372e9a5a3c559",
+            "token": "Yam_b2ATZeRdhaofjfPPEasHKNDlGBAB",
+            "expires": "2026-07-07T12:30:00Z"
+          }
+        }
+      ]
+    },
+    "signature": {
+      "mlp_sig": "verdict/1",
+      "protected": {
+        "kid": "bdyqdn2sf4ms6wvldnq7ieuwkd6lmzk4kk7esux3od27t5v73arcinga",
+        "alg": "ed25519",
+        "created": "2026-07-04T12:30:00Z"
+      },
+      "value": "tWsW5eCEb1qURos7X_kvOMEpZxaJt3EOWHXP8OapVW34Pm3VTIwWTfaQe1beuwqLmvenCQj6Zq5CXKcDA1H6Bg"
+    }
+  },
+  "sizes": {
+    "verdict_1_canonical": 708,
+    "verdict_2_canonical": 923
+  }
+}

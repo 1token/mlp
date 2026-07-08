@@ -1,0 +1,80 @@
+{
+  "vector": "TV-003",
+  "description": "Push transcript for the TV-002 Reservation: PATCH bytes 0-19 (accepted, reply lost), HEAD resume discovery (offset 20), PATCH bytes 20-35 completing; final BLAKE3 equals the TV-001 URN. Pusher bs-role key = RFC 8032 Ed25519 TEST 2.",
+  "pusher_kid": "bdyqnbqeil3qzkhtocxe77a7j5qactmknmkncicd6k2glhgyrbvnzs5a",
+  "reservation": {
+    "target_url": "https://bs.target.example/ingest/24c372e9a5a3c559",
+    "token": "Yam_b2ATZeRdhaofjfPPEasHKNDlGBAB",
+    "max_size": 36,
+    "urn": "urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y",
+    "expires": "2026-07-07T12:30:00Z"
+  },
+  "object": {
+    "bytes_utf8": "MLP test vector 001: media object A\n",
+    "size": 36,
+    "urn": "urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y"
+  },
+  "requests": [
+    {
+      "step": 1,
+      "request": "PATCH",
+      "upload_offset": 0,
+      "body_utf8": "MLP test vector 001:",
+      "headers": {
+        "Tus-Resumable": "1.0.0",
+        "Content-Type": "application/offset+octet-stream",
+        "Upload-Offset": "0",
+        "Content-Digest": "sha-256=:elXyczRHrRqKGKzoTRfF6/frGBwDKKhGCX5MVfIvkIE=:",
+        "MLP-Reservation": "Yam_b2ATZeRdhaofjfPPEasHKNDlGBAB",
+        "Signature-Input": "mlp=(\"@method\" \"@target-uri\" \"content-digest\" \"upload-offset\" \"mlp-reservation\");created=1783168260;keyid=\"bdyqnbqeil3qzkhtocxe77a7j5qactmknmkncicd6k2glhgyrbvnzs5a\";alg=\"ed25519\"",
+        "Signature": "mlp=:6sxbq5HrVYQJrR9mnyZpSA/B+N/byY0KkDwiNqtMjTGQR4hI0rY/uscB3X+du5sx+iW7ArS9x9YK7/TG5hpZBA==:"
+      },
+      "signature_base": "\"@method\": PATCH\n\"@target-uri\": https://bs.target.example/ingest/24c372e9a5a3c559\n\"content-digest\": sha-256=:elXyczRHrRqKGKzoTRfF6/frGBwDKKhGCX5MVfIvkIE=:\n\"upload-offset\": 0\n\"mlp-reservation\": Yam_b2ATZeRdhaofjfPPEasHKNDlGBAB\n\"@signature-params\": (\"@method\" \"@target-uri\" \"content-digest\" \"upload-offset\" \"mlp-reservation\");created=1783168260;keyid=\"bdyqnbqeil3qzkhtocxe77a7j5qactmknmkncicd6k2glhgyrbvnzs5a\";alg=\"ed25519\"",
+      "response": {
+        "status": 204,
+        "Upload-Offset": "20",
+        "note": "reply lost in transit (simulated)"
+      }
+    },
+    {
+      "step": 2,
+      "request": "HEAD",
+      "headers": {
+        "Tus-Resumable": "1.0.0",
+        "MLP-Reservation": "Yam_b2ATZeRdhaofjfPPEasHKNDlGBAB",
+        "Signature-Input": "mlp=(\"@method\" \"@target-uri\" \"mlp-reservation\");created=1783168265;keyid=\"bdyqnbqeil3qzkhtocxe77a7j5qactmknmkncicd6k2glhgyrbvnzs5a\";alg=\"ed25519\"",
+        "Signature": "mlp=:AdubnzXcsMJm1oXogQxXfeEtvJGTbPE3f7OuZiA+L1SlDkgMP2Mq+6I1jtvqrCXZFl0kXtAFNlgJr8o8zMyZDA==:"
+      },
+      "signature_base": "\"@method\": HEAD\n\"@target-uri\": https://bs.target.example/ingest/24c372e9a5a3c559\n\"mlp-reservation\": Yam_b2ATZeRdhaofjfPPEasHKNDlGBAB\n\"@signature-params\": (\"@method\" \"@target-uri\" \"mlp-reservation\");created=1783168265;keyid=\"bdyqnbqeil3qzkhtocxe77a7j5qactmknmkncicd6k2glhgyrbvnzs5a\";alg=\"ed25519\"",
+      "response": {
+        "status": 200,
+        "Upload-Offset": "20",
+        "Upload-Length": "36",
+        "Upload-Expires": "Tue, 07 Jul 2026 12:30:00 GMT",
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "step": 3,
+      "request": "PATCH",
+      "upload_offset": 20,
+      "body_utf8": " media object A\n",
+      "headers": {
+        "Tus-Resumable": "1.0.0",
+        "Content-Type": "application/offset+octet-stream",
+        "Upload-Offset": "20",
+        "Content-Digest": "sha-256=:jSCnywBz96P6mkQJqDHYTuicZ0YjE8qX4RZCIlUeRP0=:",
+        "MLP-Reservation": "Yam_b2ATZeRdhaofjfPPEasHKNDlGBAB",
+        "Signature-Input": "mlp=(\"@method\" \"@target-uri\" \"content-digest\" \"upload-offset\" \"mlp-reservation\");created=1783168270;keyid=\"bdyqnbqeil3qzkhtocxe77a7j5qactmknmkncicd6k2glhgyrbvnzs5a\";alg=\"ed25519\"",
+        "Signature": "mlp=:oRW2YcYDhN4TrZOoa+Ui7rRD8KpdqGXS/ol2Ww4QNC36jR1qLxYUV7wsVLR8o8Y5/m6yzgn0DmCLtPFj7lyFBA==:"
+      },
+      "signature_base": "\"@method\": PATCH\n\"@target-uri\": https://bs.target.example/ingest/24c372e9a5a3c559\n\"content-digest\": sha-256=:jSCnywBz96P6mkQJqDHYTuicZ0YjE8qX4RZCIlUeRP0=:\n\"upload-offset\": 20\n\"mlp-reservation\": Yam_b2ATZeRdhaofjfPPEasHKNDlGBAB\n\"@signature-params\": (\"@method\" \"@target-uri\" \"content-digest\" \"upload-offset\" \"mlp-reservation\");created=1783168270;keyid=\"bdyqnbqeil3qzkhtocxe77a7j5qactmknmkncicd6k2glhgyrbvnzs5a\";alg=\"ed25519\"",
+      "response": {
+        "status": 204,
+        "Upload-Offset": "36",
+        "MLP-Object-State": "verified",
+        "note": "offset == Upload-Length; final BLAKE3 matches URN; object live; token consumed"
+      }
+    }
+  ]
+}

@@ -1,0 +1,153 @@
+{
+  "vector": "TV-004",
+  "description": "Forwarding + delegated fulfillment: target.example auto-forwards the TV-001 envelope (Signed Medialet byte-identical, root attestation = TV-001 hop signature) to carol@final.example before holding custody; final.example presents the root attestation directly to origin.example via delegation/1 with a Reservation for its own BS; origin validates against its dispatch records and answers will-push. final.example key = RFC 8032 Ed25519 TEST 1024.",
+  "final_key": {
+    "seed_hex": "f5e5767cf153319517630f226876b86c8160cc583bc013744c6bf255f5cc0ee5",
+    "public_hex": "278117fc144c72340f67d0f2316e8386ceffbf2b2428c9c51fef7c597f1d426e",
+    "key": "b5uaspaix7qkey4rub5t5b4rrn2byntx7x4vsikgjyup667czp4oue3q",
+    "kid": "bdyqcchdbohwznvk63ujxoooxlrwyjlwzog4ng4ek6wuajtoqpuajolq"
+  },
+  "final_domain_document": {
+    "domain": "final.example",
+    "mlp": [
+      "0.1"
+    ],
+    "sn": "https://mlp.final.example/sn",
+    "keys": [
+      {
+        "kid": "bdyqcchdbohwznvk63ujxoooxlrwyjlwzog4ng4ek6wuajtoqpuajolq",
+        "alg": "ed25519",
+        "key": "b5uaspaix7qkey4rub5t5b4rrn2byntx7x4vsikgjyup667czp4oue3q",
+        "roles": [
+          "sn",
+          "bs"
+        ]
+      }
+    ]
+  },
+  "signed_forwarded_envelope": {
+    "envelope": {
+      "mlp": "0.1",
+      "envelope_id": "019f2c92-3458-7ba2-9bec-0190697bca43",
+      "created": "2026-07-04T10:00:07Z",
+      "origin": "target.example",
+      "envelope_to": [
+        "carol@final.example"
+      ],
+      "forwarded_by": "novak@target.example",
+      "fulfillment_sources": [
+        {
+          "domain": "origin.example"
+        }
+      ],
+      "hops": [
+        {
+          "origin": "origin.example",
+          "envelope_id": "019f2c92-2c88-7c16-a1fe-4548abf07edd",
+          "created": "2026-07-04T10:00:05Z",
+          "kid": "bdyqnbqeil3qzkhtocxe77a7j5qactmknmkncicd6k2glhgyrbvnzs5a",
+          "sig": "TiQzJ3TUxh0bpuBiLxzbOXp3Kp5WWfGR1MMDGMCWs0dG3RuFEwG3KjgWUOUwA9yLkJenGbwKwAPPR0bfjgigDQ"
+        }
+      ],
+      "medialet": {
+        "medialet": {
+          "mlp": "0.1",
+          "id": "019f2c92-1900-7b0f-8f1e-30c7d7d77f8c",
+          "author": "petra@origin.example",
+          "subject": "TV-001 sample delivery",
+          "created": "2026-07-04T10:00:00Z",
+          "displayed_to": [
+            {
+              "addr": "novak@target.example",
+              "name": "Novák Family"
+            }
+          ],
+          "body": {
+            "profile": "mlp-html/1",
+            "content": "<p>Hello from TV-001. File: <a href=\"urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y\">sample.txt</a></p>"
+          },
+          "manifest": [
+            {
+              "urn": "urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y",
+              "size": 36,
+              "type": "text/plain",
+              "name": "sample.txt",
+              "available_until": "2026-07-11T10:00:00Z"
+            }
+          ]
+        },
+        "signature": {
+          "mlp_sig": "author/1",
+          "protected": {
+            "kid": "bdyqljzaynjgp5mecdwrg6tk4xthzykaup2iua3jnsogerknzmlsizmi",
+            "alg": "ed25519",
+            "created": "2026-07-04T10:00:00Z"
+          },
+          "value": "kJ5A09wU5TcBFjxgWmTWA6QpK_BFaJk2usG0LJ1Nlqhd80jSGKwQ1Zr77YI7aXbG9b5CJ6h30C8u9EUJ8T39CA"
+        }
+      }
+    },
+    "signature": {
+      "mlp_sig": "hop/1",
+      "protected": {
+        "kid": "bdyqdn2sf4ms6wvldnq7ieuwkd6lmzk4kk7esux3od27t5v73arcinga",
+        "alg": "ed25519",
+        "created": "2026-07-04T10:00:07Z"
+      },
+      "value": "I2KM6C7gJF1QcboTSbudVWTxZGhFSc53ZcH1LQUjCLpwmymjMI1xgAIFDCtE0X4GQMIjJEkhA5ZfSy_-kP5nDw"
+    }
+  },
+  "forwarded_envelope_canonical_size": 1669,
+  "delegation_sig_input_jcs": "{\"mlp_sig\":\"delegation/1\",\"payload\":{\"created\":\"2026-07-04T11:00:00Z\",\"media\":[{\"reservation\":{\"expires\":\"2026-07-07T11:00:00Z\",\"max_size\":36,\"target_url\":\"https://bs.final.example/ingest/7b236472a18b169b\",\"token\":\"SG0L0KEh3gj7GvsW7zAuzIrG2CkvCtMH\",\"urn\":\"urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y\"},\"urn\":\"urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y\"}],\"medialet_ca\":\"urn:mlet:bdyqhmtxg343efvdn34cvh4xacxbfa7keroljucjvcpvg63rtkvhmlqa\",\"mlp\":\"0.1\",\"request_id\":\"019f2cc9-0780-796b-b6b9-f0bcd5f10c95\",\"requester\":\"final.example\",\"root\":{\"created\":\"2026-07-04T10:00:05Z\",\"envelope_id\":\"019f2c92-2c88-7c16-a1fe-4548abf07edd\",\"kid\":\"bdyqnbqeil3qzkhtocxe77a7j5qactmknmkncicd6k2glhgyrbvnzs5a\",\"origin\":\"origin.example\",\"sig\":\"TiQzJ3TUxh0bpuBiLxzbOXp3Kp5WWfGR1MMDGMCWs0dG3RuFEwG3KjgWUOUwA9yLkJenGbwKwAPPR0bfjgigDQ\"}},\"protected\":{\"alg\":\"ed25519\",\"created\":\"2026-07-04T11:00:00Z\",\"kid\":\"bdyqcchdbohwznvk63ujxoooxlrwyjlwzog4ng4ek6wuajtoqpuajolq\"}}",
+  "signed_delegation_request": {
+    "payload": {
+      "mlp": "0.1",
+      "request_id": "019f2cc9-0780-796b-b6b9-f0bcd5f10c95",
+      "created": "2026-07-04T11:00:00Z",
+      "requester": "final.example",
+      "root": {
+        "origin": "origin.example",
+        "envelope_id": "019f2c92-2c88-7c16-a1fe-4548abf07edd",
+        "created": "2026-07-04T10:00:05Z",
+        "kid": "bdyqnbqeil3qzkhtocxe77a7j5qactmknmkncicd6k2glhgyrbvnzs5a",
+        "sig": "TiQzJ3TUxh0bpuBiLxzbOXp3Kp5WWfGR1MMDGMCWs0dG3RuFEwG3KjgWUOUwA9yLkJenGbwKwAPPR0bfjgigDQ"
+      },
+      "medialet_ca": "urn:mlet:bdyqhmtxg343efvdn34cvh4xacxbfa7keroljucjvcpvg63rtkvhmlqa",
+      "media": [
+        {
+          "urn": "urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y",
+          "reservation": {
+            "urn": "urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y",
+            "max_size": 36,
+            "target_url": "https://bs.final.example/ingest/7b236472a18b169b",
+            "token": "SG0L0KEh3gj7GvsW7zAuzIrG2CkvCtMH",
+            "expires": "2026-07-07T11:00:00Z"
+          }
+        }
+      ]
+    },
+    "signature": {
+      "mlp_sig": "delegation/1",
+      "protected": {
+        "kid": "bdyqcchdbohwznvk63ujxoooxlrwyjlwzog4ng4ek6wuajtoqpuajolq",
+        "alg": "ed25519",
+        "created": "2026-07-04T11:00:00Z"
+      },
+      "value": "-_AzAVW-LxopGXOJkli948hxAsvb5Qh3b-RZO6TpotHJLLhO8W-z-39kBgugx88jOM7z28QCZX2NcjM4MOiGCQ"
+    }
+  },
+  "delegation_request_canonical_size": 1095,
+  "fulfill_response_unsigned": {
+    "media": [
+      {
+        "urn": "urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y",
+        "status": "will-push"
+      }
+    ]
+  },
+  "continuity_assertions": {
+    "medialet_content_address": "urn:mlet:bdyqhmtxg343efvdn34cvh4xacxbfa7keroljucjvcpvg63rtkvhmlqa",
+    "root_attestation_sig_equals_tv001_hop_sig": true,
+    "push_then_proceeds_as": "TV-003 shape against bs.final.example"
+  }
+}

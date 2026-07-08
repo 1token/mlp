@@ -1,0 +1,28 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  conformance-reproducibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install blake3 rfc8785 cryptography beautifulsoup4 html5lib
+      - name: regenerate all vectors
+        working-directory: conformance/generators
+        run: for g in tv-*.py; do python "$g"; done
+      - name: vectors must be byte-identical to committed
+        run: git diff --exit-code conformance/vectors
+  server-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.22' }
+      - name: vet and test against TV-001
+        working-directory: server
+        run: |
+          test -z "$(gofmt -l .)"
+          go vet ./...
+          go test ./...
+  # client-checks (tsc --noEmit, JS sanitizer vs TV-005) activate in S4.8.

@@ -1,0 +1,149 @@
+{
+  "vector": "TV-001",
+  "revision": "final (S2.4: D-61/D-62 kid and key encodings)",
+  "description": "Direct dispatch, one recipient, one Media object. Author key = RFC 8032 TEST 1; SN/BS key = RFC 8032 TEST 2.",
+  "keys": {
+    "author": {
+      "seed_hex": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+      "public_hex": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+      "key": "b5ua5owuyagblccvx2vf75u6jmqdtudxbolz5vjrdewxqegti64dvcgq",
+      "kid": "bdyqljzaynjgp5mecdwrg6tk4xthzykaup2iua3jnsogerknzmlsizmi"
+    },
+    "sn": {
+      "seed_hex": "4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb",
+      "public_hex": "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c",
+      "key": "b5uat2qaxypuehck2sk3qvj2ndn7lzheyfths5rewrtam2vprfl2gmda",
+      "kid": "bdyqnbqeil3qzkhtocxe77a7j5qactmknmkncicd6k2glhgyrbvnzs5a"
+    }
+  },
+  "media": {
+    "bytes_utf8": "MLP test vector 001: media object A\n",
+    "size": 36,
+    "urn": "urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y"
+  },
+  "domain_document": {
+    "domain": "origin.example",
+    "mlp": [
+      "0.1"
+    ],
+    "sn": "https://mlp.origin.example/sn",
+    "contact": "hostmaster@origin.example",
+    "keys": [
+      {
+        "kid": "bdyqljzaynjgp5mecdwrg6tk4xthzykaup2iua3jnsogerknzmlsizmi",
+        "alg": "ed25519",
+        "key": "b5ua5owuyagblccvx2vf75u6jmqdtudxbolz5vjrdewxqegti64dvcgq",
+        "roles": [
+          "author"
+        ]
+      },
+      {
+        "kid": "bdyqnbqeil3qzkhtocxe77a7j5qactmknmkncicd6k2glhgyrbvnzs5a",
+        "alg": "ed25519",
+        "key": "b5uat2qaxypuehck2sk3qvj2ndn7lzheyfths5rewrtam2vprfl2gmda",
+        "roles": [
+          "sn",
+          "bs"
+        ]
+      }
+    ]
+  },
+  "author_sig_input_jcs": "{\"mlp_sig\":\"author/1\",\"payload\":{\"author\":\"petra@origin.example\",\"body\":{\"content\":\"<p>Hello from TV-001. File: <a href=\\\"urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y\\\">sample.txt</a></p>\",\"profile\":\"mlp-html/1\"},\"created\":\"2026-07-04T10:00:00Z\",\"displayed_to\":[{\"addr\":\"novak@target.example\",\"name\":\"Novák Family\"}],\"id\":\"019f2c92-1900-7b0f-8f1e-30c7d7d77f8c\",\"manifest\":[{\"available_until\":\"2026-07-11T10:00:00Z\",\"name\":\"sample.txt\",\"size\":36,\"type\":\"text/plain\",\"urn\":\"urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y\"}],\"mlp\":\"0.1\",\"subject\":\"TV-001 sample delivery\"},\"protected\":{\"alg\":\"ed25519\",\"created\":\"2026-07-04T10:00:00Z\",\"kid\":\"bdyqljzaynjgp5mecdwrg6tk4xthzykaup2iua3jnsogerknzmlsizmi\"}}",
+  "hop_sig_input_jcs": "{\"mlp_sig\":\"hop/1\",\"payload\":{\"created\":\"2026-07-04T10:00:05Z\",\"envelope_id\":\"019f2c92-2c88-7c16-a1fe-4548abf07edd\",\"envelope_to\":[\"novak@target.example\"],\"medialet\":{\"medialet\":{\"author\":\"petra@origin.example\",\"body\":{\"content\":\"<p>Hello from TV-001. File: <a href=\\\"urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y\\\">sample.txt</a></p>\",\"profile\":\"mlp-html/1\"},\"created\":\"2026-07-04T10:00:00Z\",\"displayed_to\":[{\"addr\":\"novak@target.example\",\"name\":\"Novák Family\"}],\"id\":\"019f2c92-1900-7b0f-8f1e-30c7d7d77f8c\",\"manifest\":[{\"available_until\":\"2026-07-11T10:00:00Z\",\"name\":\"sample.txt\",\"size\":36,\"type\":\"text/plain\",\"urn\":\"urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y\"}],\"mlp\":\"0.1\",\"subject\":\"TV-001 sample delivery\"},\"signature\":{\"mlp_sig\":\"author/1\",\"protected\":{\"alg\":\"ed25519\",\"created\":\"2026-07-04T10:00:00Z\",\"kid\":\"bdyqljzaynjgp5mecdwrg6tk4xthzykaup2iua3jnsogerknzmlsizmi\"},\"value\":\"kJ5A09wU5TcBFjxgWmTWA6QpK_BFaJk2usG0LJ1Nlqhd80jSGKwQ1Zr77YI7aXbG9b5CJ6h30C8u9EUJ8T39CA\"}},\"mlp\":\"0.1\",\"origin\":\"origin.example\"},\"protected\":{\"alg\":\"ed25519\",\"created\":\"2026-07-04T10:00:05Z\",\"kid\":\"bdyqnbqeil3qzkhtocxe77a7j5qactmknmkncicd6k2glhgyrbvnzs5a\"}}",
+  "signed_medialet": {
+    "medialet": {
+      "mlp": "0.1",
+      "id": "019f2c92-1900-7b0f-8f1e-30c7d7d77f8c",
+      "author": "petra@origin.example",
+      "subject": "TV-001 sample delivery",
+      "created": "2026-07-04T10:00:00Z",
+      "displayed_to": [
+        {
+          "addr": "novak@target.example",
+          "name": "Novák Family"
+        }
+      ],
+      "body": {
+        "profile": "mlp-html/1",
+        "content": "<p>Hello from TV-001. File: <a href=\"urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y\">sample.txt</a></p>"
+      },
+      "manifest": [
+        {
+          "urn": "urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y",
+          "size": 36,
+          "type": "text/plain",
+          "name": "sample.txt",
+          "available_until": "2026-07-11T10:00:00Z"
+        }
+      ]
+    },
+    "signature": {
+      "mlp_sig": "author/1",
+      "protected": {
+        "kid": "bdyqljzaynjgp5mecdwrg6tk4xthzykaup2iua3jnsogerknzmlsizmi",
+        "alg": "ed25519",
+        "created": "2026-07-04T10:00:00Z"
+      },
+      "value": "kJ5A09wU5TcBFjxgWmTWA6QpK_BFaJk2usG0LJ1Nlqhd80jSGKwQ1Zr77YI7aXbG9b5CJ6h30C8u9EUJ8T39CA"
+    }
+  },
+  "signed_medialet_content_address": "urn:mlet:bdyqhmtxg343efvdn34cvh4xacxbfa7keroljucjvcpvg63rtkvhmlqa",
+  "signed_envelope": {
+    "envelope": {
+      "mlp": "0.1",
+      "envelope_id": "019f2c92-2c88-7c16-a1fe-4548abf07edd",
+      "created": "2026-07-04T10:00:05Z",
+      "origin": "origin.example",
+      "envelope_to": [
+        "novak@target.example"
+      ],
+      "medialet": {
+        "medialet": {
+          "mlp": "0.1",
+          "id": "019f2c92-1900-7b0f-8f1e-30c7d7d77f8c",
+          "author": "petra@origin.example",
+          "subject": "TV-001 sample delivery",
+          "created": "2026-07-04T10:00:00Z",
+          "displayed_to": [
+            {
+              "addr": "novak@target.example",
+              "name": "Novák Family"
+            }
+          ],
+          "body": {
+            "profile": "mlp-html/1",
+            "content": "<p>Hello from TV-001. File: <a href=\"urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y\">sample.txt</a></p>"
+          },
+          "manifest": [
+            {
+              "urn": "urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y",
+              "size": 36,
+              "type": "text/plain",
+              "name": "sample.txt",
+              "available_until": "2026-07-11T10:00:00Z"
+            }
+          ]
+        },
+        "signature": {
+          "mlp_sig": "author/1",
+          "protected": {
+            "kid": "bdyqljzaynjgp5mecdwrg6tk4xthzykaup2iua3jnsogerknzmlsizmi",
+            "alg": "ed25519",
+            "created": "2026-07-04T10:00:00Z"
+          },
+          "value": "kJ5A09wU5TcBFjxgWmTWA6QpK_BFaJk2usG0LJ1Nlqhd80jSGKwQ1Zr77YI7aXbG9b5CJ6h30C8u9EUJ8T39CA"
+        }
+      }
+    },
+    "signature": {
+      "mlp_sig": "hop/1",
+      "protected": {
+        "kid": "bdyqnbqeil3qzkhtocxe77a7j5qactmknmkncicd6k2glhgyrbvnzs5a",
+        "alg": "ed25519",
+        "created": "2026-07-04T10:00:05Z"
+      },
+      "value": "TiQzJ3TUxh0bpuBiLxzbOXp3Kp5WWfGR1MMDGMCWs0dG3RuFEwG3KjgWUOUwA9yLkJenGbwKwAPPR0bfjgigDQ"
+    }
+  },
+  "signed_envelope_canonical_size": 1297
+}
