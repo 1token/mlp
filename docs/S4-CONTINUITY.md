@@ -2,7 +2,7 @@
 
 > Purpose: resume implementation in a fresh working session with zero
 > context loss. Read this first; everything else is referenced from it.
-> Updated at the S4.2 → S4.3 boundary (2026-07-08).
+> Updated at the S4.3 → S4.4 boundary (2026-07-08).
 
 ## 1. Project in one paragraph
 
@@ -28,7 +28,8 @@ sequential D-number; changes to frozen artifacts travel only as MEPs.
 - `docs/closing/` — the full decision registers: Stage 1 (D-01–42),
   Stage 2 (D-43–108), Stage 3 (D-109–181).
 - `server/` — Go module `medialet.org/mlp`; built so far: `core/`
-  (S4.1), `store/` (S4.2). `client/` — not started.
+  (S4.1), `store/` (S4.2), `discovery/` (S4.3). `client/` — not
+  started.
 
 ## 3. Stage 4 state
 
@@ -37,8 +38,9 @@ sequential D-number; changes to frozen artifacts travel only as MEPs.
 | S4.0 | Repo scaffold, MEP-001/002 filed, TV-002–004 generators reconstructed | all five vectors regenerate **byte-identically**; CI gate |
 | S4.1 | `core/`: JCS (D-43 dialect, own RFC 8785 writers), multiformats, kid self-verify, SignDoc/VerifyDoc with label context match | `go test` recomputes **every** TV-001 value incl. deterministic sigs and UUIDv7s |
 | S4.2 | `store/`: 0001 migration (~30 tables), runner (`user_version`), D-87 state machine **enforced by trigger** | legal walk green; 6 forbidden transitions abort; replay-unique; reservation terminal |
+| S4.3 | Generator-debt repair (D-197); `discovery/`: Domain Document parsing (§5.2/§6.1–6.3), hardened fetch (§5.4), Resolver with 24 h ceiling + unknown-kid re-fetch + negative cache (§5.5) | TV-001 `domain_document` fixture is the parsing anchor; 21 tests green incl. dial-time SSRF wiring proof; all five vectors regenerate byte-identically **for real** now |
 
-Register tail since the Stage 3 closing doc: **D-182–D-195** —
+Register tail since the Stage 3 closing doc: **D-182–D-200** —
 D-182 repo/CI · D-183 MEP template · D-184/185 MEP-001/002 filed ·
 D-186 generator debt paid · D-187 module + zeebo/blake3 (mandated by
 §6.4) · D-188 JCS approach (dialect violations are errors) · D-189
@@ -48,7 +50,37 @@ code driver-agnostic) · D-192 schema conventions (RFC3339 TEXT;
 JSON-as-TEXT; minted secrets stored as `*_hash`, presented tokens
 plaintext) · D-193 refs trigger = D-87 verbatim · D-194 federation
 records (dispatches = §9.5 credential store; full verdict history for
-the D-149 timeline; `hasher_state` per D-27) · D-195 schema accepted.
+the D-149 timeline; `hasher_state` per D-27) · D-195 schema accepted ·
+D-196 continuity working practice (public repo as carrier; clone,
+read this brief, **verify inherited state before building**) ·
+D-197 generator-debt repair: tv-001.py was still the pre-S2.4
+provisional generator (stdout-only, raw-key kid) so the CI
+reproducibility gate passed vacuously for TV-001, and tv-005.py wrote
+to a sandbox path absent in CI; both fixed, all five vectors verified
+byte-identical (vector *content* was never wrong — core go tests
+independently recompute TV-001) · D-198 Domain Document parsing
+semantics: D-43 dialect parser; document-level hard failures (missing
+required member, domain-binding mismatch, empty version intersection,
+non-https `sn`, >64 entries, >65,536 bytes) vs §6.2 entry-level
+ignores (kid self-verify failure, alg/multicodec mismatch, malformed
+entry or window, duplicate kid) with a `Rejected` count; empty key
+set allowed (spec-literal); `VerificationKey(kid, role, at)` bundles
+the §6.3 role + window + decode checks for S4.4 · D-199 hardened
+fetch posture: address filter runs in the dialer `Control` hook on
+the literal address at connect(2) time — check and use coincide, the
+§5.4 pinning requirement; forbidden set = spec list + IANA extras
+(192.0.0.0/24, TEST-NETs, 198.18/15, 240/4 incl. broadcast,
+2001:db8::/32, NAT64 64:ff9b::/96, v4-mapped unmapped first);
+https+443 enforced on the initial URL and every redirect hop; cap
+applies to decoded body bytes with abort-on-overrun; connect 5 s /
+total 10 s; no proxy, no cookies, no bodies · D-200 caching
+semantics: TTL = min(Cache-Control max-age, 24 h), absent freshness
+info defaults to the ceiling itself, no-store/no-cache/max-age=0
+stores the row already-stale (document used once, never reused);
+unknown kid forces exactly one re-fetch and only when the miss came
+from cache (a fresh document is already authoritative); negative
+cache in-memory, 5 min; cached documents re-validated on every load
+(cache is data, not authority).
 
 ## 4. Environment recipe (sandbox)
 
@@ -65,12 +97,12 @@ shipping driver (one import swap) — D-191.
 
 ## 5. Next: the remaining build order (Stage 3 Closing §5)
 
-**S4.3 (next)** — Discovery + Domain Document: hardened fetch profile
+**S4.3 — done** (see table). Discovery + Domain Document: hardened fetch profile
 (§5.4/D-59: redirect/size/timeout limits, SSRF address filtering),
 `domain` binding check, kid self-verification wired on key-set load,
 24 h cache ceiling into `domain_docs`/`domain_keys` (D-33); TV-001's
 Domain Document fixture as the parsing anchor.
-Then: S4.4 `/dispatch`+verdicts (TV-002) · S4.5 tus transfer +
+**S4.4 (next)**: `/dispatch`+verdicts (TV-002); consume `discovery.Resolver.ResolveKID` and `Document.VerificationKey` for hop/verdict verification. Then: S4.5 tus transfer +
 transactional PATCH (TV-003) · S4.6 forwarding/delegation (TV-004) ·
 S4.7 Client API + SSE · S4.8–11 client (Body viewer + JS sanitizer
 gated on TV-005 tree equality FIRST, then Inbox → composer →
@@ -82,8 +114,9 @@ conformance hardening + operator guide + NLnet.
 
 Per session: design/implementation presented with lettered judgment
 calls → Igor confirms explicitly → decisions frozen with sequential
-D-numbers (next free: **D-196**) → artifacts delivered (tarball per
-session) → next-session pointer. Honesty rules: caught problems are
+D-numbers (next free: **D-201**) → artifacts delivered as local
+commits emitted as a `git format-patch` series against `origin/main`
+for Igor's review, `git am`, and push (D-196) → next-session pointer. Honesty rules: caught problems are
 surfaced, never patched silently; spec gaps go to the MEP queue;
 conformance claims are machine-verified.
 
@@ -91,7 +124,6 @@ conformance claims are machine-verified.
 
 1. Decide MEP-001 and MEP-002 (accept/reject/amend).
 2. Product brand name before launch (D-180).
-3. Publish the repository (D-40 public-repo commitment) — also the
-   best continuation carrier: a public GitHub repo can be cloned
-   directly in future sessions (github.com is reachable), replacing
-   tarball uploads entirely.
+3. ~~Publish the repository~~ — done: github.com/1token/mlp is live
+   and is the continuation carrier (cloned directly in S4.3; D-40,
+   D-196).
