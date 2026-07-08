@@ -180,5 +180,5 @@ vector = {"vector": "TV-005",
  "foreign_urn_used": URN_FOREIGN,
  "idempotence": "verified for every case (sanitize∘sanitize = sanitize)",
  "cases": results}
-open("/mnt/user-data/outputs/mlp-tv-005.json","w").write(json.dumps(vector, indent=2, ensure_ascii=False))
+open("../vectors/mlp-tv-005.json","w").write(json.dumps(vector, indent=2, ensure_ascii=False))
 print("foreign urn:", URN_FOREIGN)
