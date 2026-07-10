@@ -2,7 +2,7 @@
 
 > Purpose: resume implementation in a fresh working session with zero
 > context loss. Read this first; everything else is referenced from it.
-> Updated at the S4.4 → S4.5 boundary (2026-07-09).
+> Updated at the S4.5 → S4.6 boundary (2026-07-10).
 
 ## 1. Project in one paragraph
 
@@ -28,8 +28,8 @@ sequential D-number; changes to frozen artifacts travel only as MEPs.
 - `docs/closing/` — the full decision registers: Stage 1 (D-01–42),
   Stage 2 (D-43–108), Stage 3 (D-109–181).
 - `server/` — Go module `medialet.org/mlp`; built so far: `core/`
-  (S4.1), `store/` (S4.2), `discovery/` (S4.3), `sn/` (S4.4).
-  `client/` — not started.
+  (S4.1), `store/` (S4.2), `discovery/` (S4.3), `sn/` (S4.4),
+  `bs/` (S4.5). `client/` — not started.
 
 ## 3. Stage 4 state
 
@@ -40,6 +40,7 @@ sequential D-number; changes to frozen artifacts travel only as MEPs.
 | S4.2 | `store/`: 0001 migration (~30 tables), runner (`user_version`), D-87 state machine **enforced by trigger** | legal walk green; 6 forbidden transitions abort; replay-unique; reservation terminal |
 | S4.3 | Generator-debt repair (D-197); `discovery/`: Domain Document parsing (§5.2/§6.1–6.3), hardened fetch (§5.4), Resolver with 24 h ceiling + unknown-kid re-fetch + negative cache (§5.5) | TV-001 `domain_document` fixture is the parsing anchor; 21 tests green incl. dial-time SSRF wiring proof; all five vectors regenerate byte-identically **for real** now |
 | S4.4 | `sn/`: §3.4.4 validation sequence, §7.3 `/dispatch` with D-74 retry idempotency, §7.4 verdict generation + verification, §7.5 reservations, §7.6 `/verdict` updates with the transition table, §7.7 default tiers, RFC 9457 problems | dispatching the TV-001 envelope reproduces TV-002 **verdict 1 byte-identically** (708 B, exact sig); recipient-accept reproduces **verdict 2** (923 B) and mints the reservation; failure matrix maps every §3.4.4 item to its §7.8 code; deny→grant refused as `invalid-transition` |
+| S4.5 | `bs/`: §6.6 RFC 9421 profile, the §8.2–8.4 upload resource with the D-77 transactional pipeline, D-27 BLAKE3 checkpoints, §8.5 failure taxonomy, §8.7 pusher loop under D-72 | all three TV-003 signature bases reproduce **byte-identically** and vector signatures verify; the transcript replays header-for-header (204/20, HEAD 200 with the exact `Upload-Expires`, 204/36 `verified`); digest-mismatch rolls back, hash-mismatch resets to 0 and recovers, restart re-derives the checkpoint; the pusher survives a lost 204 with PATCH offsets exactly [0, 20] |
 
 Register tail since the Stage 3 closing doc: **D-182–D-204** —
 D-182 repo/CI · D-183 MEP template · D-184/185 MEP-001/002 filed ·
@@ -109,7 +110,35 @@ stored for the D-149 history but never applied; duplicate
 `verdict_id` re-POSTs are idempotent 204s; the issuer must equal the
 dispatch's `target_domain` else `unknown-envelope`; an update
 arriving before the recorded synchronous response establishes the
-baseline.
+baseline · D-205 checkpoint persistence strategy: zeebo/blake3 has no
+hasher-state serialization, so D-27 checkpoints are transactional
+in-memory `Clone()`s, and restart durability comes from
+**re-derivation** — the quarantined partial, truncated exactly at the
+durable offset, fully determines the hasher state; `hasher_state`
+stays NULL, reserved for a future serializable hasher (the D-27
+invariant holds: HEAD never lies, restarts recover, cost is one
+O(offset) re-hash) · D-206 RFC 9421 implementation posture: strict
+profile-only parsing (label `mlp`, covered components equal to the
+D-66 sets *as ordered*, created+keyid required, alg only ed25519);
+the base's `@signature-params` line reuses the verbatim
+Signature-Input serialization for byte fidelity; `@target-uri`
+reconstructed as configured `PublicBase` + request URI · D-207
+transfer failure-code judgments: a body exceeding the exact declared
+size aborts as **`hash-mismatch`** with reset-to-zero (the bytes
+cannot match the URN — object-level wrongness, not transport);
+consumed tokens answer 410 `reservation-invalid`, unknown tokens 401;
+Tus-Resumable mismatch → 412; segment verification (D-78 SHOULD) and
+the slow-loris throughput floor (§8.6 MAY) deferred as
+quality-of-implementation — the completion check is the conformance
+floor · D-208 pusher posture: `discovery.ForbiddenAddr` exported for
+D-72 reuse; the hardened default client refuses http, all redirects,
+and forbidden addresses at dial time; no overall timeout (PATCH
+bodies are legitimately long-lived — cancellation is the context's);
+digest/offset mismatches realign via HEAD bounded by the attempt
+budget; `reservation-expired`/`-invalid` surface as a typed
+renegotiation error for the §7.6 grant→grant path; a lost *final* 204
+resolves at the negotiation layer (re-HEAD meets the consumed token,
+renegotiation answers `have`).
 
 ## 4. Environment recipe (sandbox)
 
@@ -131,7 +160,7 @@ shipping driver (one import swap) — D-191.
 `domain` binding check, kid self-verification wired on key-set load,
 24 h cache ceiling into `domain_docs`/`domain_keys` (D-33); TV-001's
 Domain Document fixture as the parsing anchor.
-**S4.4 — done** (see table). **S4.5 (next)**: tus transfer +
+**S4.4, S4.5 — done** (see table). **S4.6 (next)**: forwarding/delegation (TV-004) — §9 requester flow, delegation requests, source-side validation; consumes `sn` envelope machinery (hops, `fulfillment_sources`) and `bs.Pusher` for delegated pushes. Then:
 transactional PATCH (TV-003), consuming `reservations_in` (token-hash check, `hasher_state` BLAKE3 checkpoints per D-27/D-77) and `reservations_out` (push side, §7.5 D-72 pusher connection safety reusing the discovery address filter) · S4.6 forwarding/delegation (TV-004) ·
 S4.7 Client API + SSE · S4.8–11 client (Body viewer + JS sanitizer
 gated on TV-005 tree equality FIRST, then Inbox → composer →
@@ -143,7 +172,7 @@ conformance hardening + operator guide + NLnet.
 
 Per session: design/implementation presented with lettered judgment
 calls → Igor confirms explicitly → decisions frozen with sequential
-D-numbers (next free: **D-205**) → artifacts delivered as local
+D-numbers (next free: **D-209**) → artifacts delivered as local
 commits emitted as a `git format-patch` series against `origin/main`
 for Igor's review, `git am`, and push (D-196) → next-session pointer. Honesty rules: caught problems are
 surfaced, never patched silently; spec gaps go to the MEP queue;

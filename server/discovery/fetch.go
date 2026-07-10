@@ -217,3 +217,8 @@ func freshness(h http.Header, fallback time.Duration) time.Duration {
 }
 
 var errNegativeCached = errors.New("mlp/discovery: domain in negative cache (§5.5)")
+
+// ForbiddenAddr reports whether ip falls in the §5.4 rule-4 forbidden
+// set. Exported for the D-72 pusher connection-safety reuse (§7.5,
+// §8.2): transfer clients apply the same address filter at dial time.
+func ForbiddenAddr(ip netip.Addr) bool { return addrForbidden(ip) }
