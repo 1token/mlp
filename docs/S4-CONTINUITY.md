@@ -2,7 +2,7 @@
 
 > Purpose: resume implementation in a fresh working session with zero
 > context loss. Read this first; everything else is referenced from it.
-> Updated at the S4.3 → S4.4 boundary (2026-07-08).
+> Updated at the S4.4 → S4.5 boundary (2026-07-09).
 
 ## 1. Project in one paragraph
 
@@ -28,8 +28,8 @@ sequential D-number; changes to frozen artifacts travel only as MEPs.
 - `docs/closing/` — the full decision registers: Stage 1 (D-01–42),
   Stage 2 (D-43–108), Stage 3 (D-109–181).
 - `server/` — Go module `medialet.org/mlp`; built so far: `core/`
-  (S4.1), `store/` (S4.2), `discovery/` (S4.3). `client/` — not
-  started.
+  (S4.1), `store/` (S4.2), `discovery/` (S4.3), `sn/` (S4.4).
+  `client/` — not started.
 
 ## 3. Stage 4 state
 
@@ -39,8 +39,9 @@ sequential D-number; changes to frozen artifacts travel only as MEPs.
 | S4.1 | `core/`: JCS (D-43 dialect, own RFC 8785 writers), multiformats, kid self-verify, SignDoc/VerifyDoc with label context match | `go test` recomputes **every** TV-001 value incl. deterministic sigs and UUIDv7s |
 | S4.2 | `store/`: 0001 migration (~30 tables), runner (`user_version`), D-87 state machine **enforced by trigger** | legal walk green; 6 forbidden transitions abort; replay-unique; reservation terminal |
 | S4.3 | Generator-debt repair (D-197); `discovery/`: Domain Document parsing (§5.2/§6.1–6.3), hardened fetch (§5.4), Resolver with 24 h ceiling + unknown-kid re-fetch + negative cache (§5.5) | TV-001 `domain_document` fixture is the parsing anchor; 21 tests green incl. dial-time SSRF wiring proof; all five vectors regenerate byte-identically **for real** now |
+| S4.4 | `sn/`: §3.4.4 validation sequence, §7.3 `/dispatch` with D-74 retry idempotency, §7.4 verdict generation + verification, §7.5 reservations, §7.6 `/verdict` updates with the transition table, §7.7 default tiers, RFC 9457 problems | dispatching the TV-001 envelope reproduces TV-002 **verdict 1 byte-identically** (708 B, exact sig); recipient-accept reproduces **verdict 2** (923 B) and mints the reservation; failure matrix maps every §3.4.4 item to its §7.8 code; deny→grant refused as `invalid-transition` |
 
-Register tail since the Stage 3 closing doc: **D-182–D-200** —
+Register tail since the Stage 3 closing doc: **D-182–D-204** —
 D-182 repo/CI · D-183 MEP template · D-184/185 MEP-001/002 filed ·
 D-186 generator debt paid · D-187 module + zeebo/blake3 (mandated by
 §6.4) · D-188 JCS approach (dialect violations are errors) · D-189
@@ -80,7 +81,35 @@ stores the row already-stale (document used once, never reused);
 unknown kid forces exactly one re-fetch and only when the miss came
 from cache (a fresh document is already authoritative); negative
 cache in-memory, 5 min; cached documents re-validated on every load
-(cache is data, not authority).
+(cache is data, not authority) · D-201 S4.4 scope & surface: `sn/`
+implements §7 (`/dispatch`, verdicts, `/verdict` updates, RFC 9457
+problems); §3.4.4 items 1–5 in `ParseEnvelope`, 6–7 in
+`ProcessDispatch`; locality and structural-cap violations map to
+`malformed` (no closer §7.8 code exists); `discovery` exports
+`ErrUnknownKID` so consumers map unknown-kid → `signature-invalid`
+vs resolution failure → `discovery-failed` · D-202 policy posture:
+tier matching compares mailbox keys against the *author* identity
+(the value the Medialet attests); `tier_override='block'` →
+quarantined with reason `policy`; same-domain author → Tier 1; quota
+headroom stubbed permissive until S4.5 object accounting; Tier-2
+possession answered as plain `defer` (no disclosure — the D-29
+masked-grant machinery arrives with the BS in S4.5); quarantined-only
+Envelopes get `defer`/`policy` · D-203 persistence: `medialets.raw`
+stores the JCS canonical Signed Medialet (identity-preserving; equals
+received bytes for JCS emitters per §2.4 SHOULD); an (author, id)
+pair bound to *different* content is refused as `replay` (D-46);
+reservations minted hash-only (D-192); full verdict history with
+per-URN rows (D-71/D-149) · D-204 §7.6 update semantics:
+unchanged-state entries in snapshots are no-ops (terminal have/deny
+are not "altered" by restatement; grant→grant with a Reservation is
+the explicit refresh); state *changes* are confined to the table,
+any violation discards the whole update as `invalid-transition`;
+supersession by (`created`, `verdict_id`) — stale snapshots are
+stored for the D-149 history but never applied; duplicate
+`verdict_id` re-POSTs are idempotent 204s; the issuer must equal the
+dispatch's `target_domain` else `unknown-envelope`; an update
+arriving before the recorded synchronous response establishes the
+baseline.
 
 ## 4. Environment recipe (sandbox)
 
@@ -102,8 +131,8 @@ shipping driver (one import swap) — D-191.
 `domain` binding check, kid self-verification wired on key-set load,
 24 h cache ceiling into `domain_docs`/`domain_keys` (D-33); TV-001's
 Domain Document fixture as the parsing anchor.
-**S4.4 (next)**: `/dispatch`+verdicts (TV-002); consume `discovery.Resolver.ResolveKID` and `Document.VerificationKey` for hop/verdict verification. Then: S4.5 tus transfer +
-transactional PATCH (TV-003) · S4.6 forwarding/delegation (TV-004) ·
+**S4.4 — done** (see table). **S4.5 (next)**: tus transfer +
+transactional PATCH (TV-003), consuming `reservations_in` (token-hash check, `hasher_state` BLAKE3 checkpoints per D-27/D-77) and `reservations_out` (push side, §7.5 D-72 pusher connection safety reusing the discovery address filter) · S4.6 forwarding/delegation (TV-004) ·
 S4.7 Client API + SSE · S4.8–11 client (Body viewer + JS sanitizer
 gated on TV-005 tree equality FIRST, then Inbox → composer →
 Deliveries → Media → identity/junk) · S4.12 guest+claim · S4.13
@@ -114,7 +143,7 @@ conformance hardening + operator guide + NLnet.
 
 Per session: design/implementation presented with lettered judgment
 calls → Igor confirms explicitly → decisions frozen with sequential
-D-numbers (next free: **D-201**) → artifacts delivered as local
+D-numbers (next free: **D-205**) → artifacts delivered as local
 commits emitted as a `git format-patch` series against `origin/main`
 for Igor's review, `git am`, and push (D-196) → next-session pointer. Honesty rules: caught problems are
 surfaced, never patched silently; spec gaps go to the MEP queue;

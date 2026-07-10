@@ -85,7 +85,7 @@ func (r *Resolver) ResolveKID(ctx context.Context, domain, kid string) (*KeyEntr
 			return e, nil
 		}
 	}
-	return nil, fmt.Errorf("mlp/discovery: unknown kid %s for %s after re-fetch (§5.5)", kid, domain)
+	return nil, fmt.Errorf("%w: %s for %s after re-fetch (§5.5)", ErrUnknownKID, kid, domain)
 }
 
 func findKID(doc *Document, kid string) *KeyEntry {
@@ -96,6 +96,12 @@ func findKID(doc *Document, kid string) *KeyEntry {
 	}
 	return nil
 }
+
+// ErrUnknownKID reports a kid absent from a domain's key set even
+// after the §5.5 forced re-fetch. Consumers map it to
+// signature-invalid (§7.3), as opposed to resolution failures, which
+// map to discovery-failed.
+var ErrUnknownKID = errors.New("mlp/discovery: unknown kid")
 
 // resolve is the single resolution path. force bypasses the positive
 // cache (unknown-kid re-fetch); the negative cache is honored in all
