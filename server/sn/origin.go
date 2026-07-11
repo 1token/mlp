@@ -3,6 +3,7 @@ package sn
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/http"
 )
@@ -162,8 +163,30 @@ func (s *SN) applySnapshot(ctx context.Context, pv *ParsedVerdict, isUpdate bool
 	if err := tx.Commit(); err != nil {
 		return problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
 	}
-	_ = isUpdate // both paths share semantics; the flag documents intent at call sites
+	s.recordTimeline(ctx, pv, isUpdate)
 	return nil
+}
+
+// recordTimeline appends the D-149 protocol fact when the dispatch
+// is linked to a delivery (best-effort; the snapshot itself is
+// already durable in verdicts).
+func (s *SN) recordTimeline(ctx context.Context, pv *ParsedVerdict, isUpdate bool) {
+	var deliveryID int64
+	if err := s.DB.QueryRowContext(ctx,
+		`SELECT delivery_id FROM dispatches WHERE envelope_id=? AND delivery_id IS NOT NULL`,
+		pv.EnvelopeID).Scan(&deliveryID); err != nil {
+		return
+	}
+	kind := "verdict.received"
+	if isUpdate {
+		kind = "verdict.updated"
+	}
+	data, _ := json.Marshal(map[string]any{
+		"issuer": pv.Issuer, "verdict_id": pv.VerdictID, "message": pv.Message,
+	})
+	s.DB.ExecContext(ctx,
+		`INSERT INTO timeline_events (delivery_id, at, kind, data_json) VALUES (?,?,?,?)`,
+		deliveryID, pv.Created, kind, string(data))
 }
 
 func appendUnique(list []MediaOutcome, m MediaOutcome) []MediaOutcome {
