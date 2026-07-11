@@ -187,5 +187,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/quota", s.handler(s.handleQuota))
 	mux.HandleFunc("GET /api/v1/settings", s.handler(s.handleSettingsGet))
 	mux.HandleFunc("PATCH /api/v1/settings", s.handler(s.handleSettingsPatch))
+	s.registerThreadRoutes(mux)
 	return mux
 }

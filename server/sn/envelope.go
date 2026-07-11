@@ -62,6 +62,9 @@ type ParsedEnvelope struct {
 	Author         string
 	AuthorDomain   string
 	MedialetID     string
+	Subject        string
+	InReplyTo      string
+	MedialetTime   string // medialet.created
 	Manifest       []ManifestEntry
 	HopsJSON       string // verbatim-equivalent JSON of hops, "" when absent
 	ForwardedBy    string
@@ -318,9 +321,12 @@ func (pe *ParsedEnvelope) validateMedialet() *Problem {
 		if !ok || cp(str) < 1 || cp(str) > 256 {
 			return malformed("subject outside 1–256 code points (§3.2.1)")
 		}
+		pe.Subject = str
 	}
 	if c, ok := m["created"].(string); !ok || !rfc3339utc(c) {
 		return malformed("malformed medialet created (§3.2.1)")
+	} else {
+		pe.MedialetTime = c
 	}
 	if irt, present := m["in_reply_to"]; present {
 		s, ok := irt.(string)
@@ -330,6 +336,7 @@ func (pe *ParsedEnvelope) validateMedialet() *Problem {
 		if _, err := core.ParseURNMlet(s); err != nil {
 			return malformed("in_reply_to is not a content address (D-49): %v", err)
 		}
+		pe.InReplyTo = s
 	}
 	for _, field := range []string{"displayed_to", "displayed_cc"} {
 		if r, present := m[field]; present {

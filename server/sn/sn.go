@@ -150,7 +150,7 @@ func (s *SN) ProcessDispatch(ctx context.Context, raw []byte) ([]byte, *Problem)
 
 	// Acceptance policy (§7.7) — only now (§3.4.4: recipient
 	// existence and verdicts are policy outcomes).
-	recipients, anyT1, anyAccepted, anyQuarantined, prob := s.evaluateRecipients(ctx, pe)
+	recipients, targets, anyT1, anyAccepted, anyQuarantined, prob := s.evaluateRecipients(ctx, pe)
 	if prob != nil {
 		return nil, prob
 	}
@@ -167,6 +167,9 @@ func (s *SN) ProcessDispatch(ctx context.Context, raw []byte) ([]byte, *Problem)
 	}
 
 	if prob := s.persistDispatch(ctx, pe, payload, canon, reservations, now); prob != nil {
+		return nil, prob
+	}
+	if prob := s.materialize(ctx, pe, targets, now); prob != nil {
 		return nil, prob
 	}
 	return canon, nil
@@ -196,7 +199,15 @@ const (
 // evaluateRecipients applies the §7.7 defaults per envelope_to entry.
 // Trust matching compares mailbox keys (§4.2, D-55) against the
 // author (the sender identity the Medialet attests).
-func (s *SN) evaluateRecipients(ctx context.Context, pe *ParsedEnvelope) (out []RecipientOutcome, anyT1, anyAccepted, anyQuarantined bool, prob *Problem) {
+// recipientTarget pairs an outcome with its resolved local mailbox
+// (0 when the recipient is unknown) for the S4.9 materialization.
+type recipientTarget struct {
+	addr      string
+	mailboxID int64
+	verdict   string
+}
+
+func (s *SN) evaluateRecipients(ctx context.Context, pe *ParsedEnvelope) (out []RecipientOutcome, targets []recipientTarget, anyT1, anyAccepted, anyQuarantined bool, prob *Problem) {
 	senderKey := MailboxKey(pe.Author)
 	for _, addr := range pe.EnvelopeTo {
 		key := MailboxKey(addr)
@@ -210,7 +221,7 @@ func (s *SN) evaluateRecipients(ctx context.Context, pe *ParsedEnvelope) (out []
 			out = append(out, RecipientOutcome{Addr: addr, Verdict: "rejected", Reason: "unknown-recipient"})
 			continue
 		case err != nil:
-			return nil, false, false, false, problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
+			return nil, nil, false, false, false, problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
 		}
 
 		t := tierStranger
@@ -230,7 +241,7 @@ func (s *SN) evaluateRecipients(ctx context.Context, pe *ParsedEnvelope) (out []
 		case errors.Is(err, sql.ErrNoRows):
 			// no relationship recorded
 		default:
-			return nil, false, false, false, problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
+			return nil, nil, false, false, false, problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
 		}
 		if t == tierStranger && pe.AuthorDomain == s.Domain {
 			t = tierCorrespondent // same domain (§7.7 Tier 1)
@@ -240,15 +251,18 @@ func (s *SN) evaluateRecipients(ctx context.Context, pe *ParsedEnvelope) (out []
 		case tierCorrespondent:
 			anyT1, anyAccepted = true, true
 			out = append(out, RecipientOutcome{Addr: addr, Verdict: "accepted"})
+			targets = append(targets, recipientTarget{addr: addr, mailboxID: mailboxID, verdict: "accepted"})
 		case tierStranger:
 			anyAccepted = true
 			out = append(out, RecipientOutcome{Addr: addr, Verdict: "accepted"})
+			targets = append(targets, recipientTarget{addr: addr, mailboxID: mailboxID, verdict: "accepted"})
 		case tierSuspect:
 			anyQuarantined = true
 			out = append(out, RecipientOutcome{Addr: addr, Verdict: "quarantined", Reason: "policy"})
+			targets = append(targets, recipientTarget{addr: addr, mailboxID: mailboxID, verdict: "quarantined"})
 		}
 	}
-	return out, anyT1, anyAccepted, anyQuarantined, nil
+	return out, targets, anyT1, anyAccepted, anyQuarantined, nil
 }
 
 // mediaOutcomes computes the §7.4 per-URN verdicts as the union need

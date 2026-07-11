@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"medialet.org/mlp/core"
 )
@@ -42,9 +43,29 @@ func (s *Server) handleAccept(w http.ResponseWriter, r *http.Request, mailbox in
 	}
 
 	var hops sql.NullString
+	var medialetCA string
 	if err := s.DB.QueryRowContext(r.Context(),
-		`SELECT hops_json FROM envelopes_in WHERE origin=? AND envelope_id=?`,
-		origin, envelopeID).Scan(&hops); err != nil {
+		`SELECT hops_json, medialet_ca FROM envelopes_in WHERE origin=? AND envelope_id=?`,
+		origin, envelopeID).Scan(&hops, &medialetCA); err != nil {
+		return problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
+	}
+	// The acting mailbox must actually hold this delivery (S4.9,
+	// closing the D-213 single-user note): a messages row is the
+	// materialized proof of recipiency.
+	var held int
+	if err := s.DB.QueryRowContext(r.Context(),
+		`SELECT COUNT(*) FROM messages WHERE mailbox_id=? AND medialet_ca=?`,
+		mailbox, medialetCA).Scan(&held); err != nil {
+		return problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
+	}
+	if held == 0 {
+		return problemf(http.StatusNotFound, "malformed", "no delivery of %s to this mailbox", urn)
+	}
+	// Accepting flips the refs state machine: offered -> expected
+	// (§10.3; the trigger enforces legality).
+	if _, err := s.DB.ExecContext(r.Context(),
+		`UPDATE refs SET state='expected', updated_at=? WHERE mailbox_id=? AND urn=? AND medialet_ca=? AND state='offered'`,
+		s.now().Format(time.RFC3339), mailbox, urn, medialetCA); err != nil {
 		return problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
 	}
 

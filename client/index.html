@@ -1,0 +1,30 @@
+<!doctype html>
+<!-- MLP client shell (S3.9 §1). No frameworks, no build step: ES6
+     modules served as written (D-116). The CSP is the app-chrome
+     posture: nothing loads or connects except same-origin, no
+     inline script, forms nowhere; style 'unsafe-inline' admits the
+     sanitizer-permitted style *attributes* (§11.3) and nothing else
+     gains by it (there is no <style> injection path — the sanitizer
+     drops the element and the html`` discipline escapes chrome). -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'none';
+    script-src 'self';
+    connect-src 'self';
+    img-src 'self';
+    media-src 'self';
+    style-src 'self' 'unsafe-inline';
+    base-uri 'none';
+    form-action 'none';
+    frame-ancestors 'none'">
+  <title>Medialet</title>
+  <link rel="stylesheet" href="styles/app.css">
+</head>
+<body>
+  <mlp-app></mlp-app>
+  <script type="module" src="app/mlp-app.js"></script>
+</body>
+</html>

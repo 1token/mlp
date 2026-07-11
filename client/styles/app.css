@@ -1,0 +1,14 @@
+/* Minimal S4.9 chrome; the S3.10 visual pass replaces this. */
+:root { font-family: system-ui, sans-serif; color: #1a1a1a; }
+body { margin: 0; }
+main { max-width: 52rem; margin: 0 auto; padding: 1rem; }
+button { cursor: pointer; }
+.thread-row { display: flex; gap: .75rem; padding: .6rem .4rem; border-bottom: 1px solid #e5e5e5; align-items: baseline; }
+.thread-row.unread .subject { font-weight: 700; }
+.thread-row .who { min-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thread-row .subject { flex: 1; }
+.chip { font-size: .8rem; background: #eef; border-radius: .6rem; padding: 0 .5rem; }
+.undo-bar { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%);
+  background: #222; color: #fff; padding: .5rem 1rem; border-radius: .4rem; }
+.msg { border: 1px solid #e5e5e5; border-radius: .4rem; margin: .8rem 0; padding: .8rem; }
+.msg header { color: #555; font-size: .9rem; margin-bottom: .5rem; }
