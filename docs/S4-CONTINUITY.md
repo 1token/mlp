@@ -2,7 +2,7 @@
 
 > Purpose: resume implementation in a fresh working session with zero
 > context loss. Read this first; everything else is referenced from it.
-> Updated at the S4.5 → S4.6 boundary (2026-07-10).
+> Updated at the S4.6 → S4.7 boundary (2026-07-10).
 
 ## 1. Project in one paragraph
 
@@ -28,8 +28,8 @@ sequential D-number; changes to frozen artifacts travel only as MEPs.
 - `docs/closing/` — the full decision registers: Stage 1 (D-01–42),
   Stage 2 (D-43–108), Stage 3 (D-109–181).
 - `server/` — Go module `medialet.org/mlp`; built so far: `core/`
-  (S4.1), `store/` (S4.2), `discovery/` (S4.3), `sn/` (S4.4),
-  `bs/` (S4.5). `client/` — not started.
+  (S4.1), `store/` (S4.2), `discovery/` (S4.3), `sn/` (S4.4 + S4.6
+  forwarding/delegation), `bs/` (S4.5). `client/` — not started.
 
 ## 3. Stage 4 state
 
@@ -40,6 +40,7 @@ sequential D-number; changes to frozen artifacts travel only as MEPs.
 | S4.2 | `store/`: 0001 migration (~30 tables), runner (`user_version`), D-87 state machine **enforced by trigger** | legal walk green; 6 forbidden transitions abort; replay-unique; reservation terminal |
 | S4.3 | Generator-debt repair (D-197); `discovery/`: Domain Document parsing (§5.2/§6.1–6.3), hardened fetch (§5.4), Resolver with 24 h ceiling + unknown-kid re-fetch + negative cache (§5.5) | TV-001 `domain_document` fixture is the parsing anchor; 21 tests green incl. dial-time SSRF wiring proof; all five vectors regenerate byte-identically **for real** now |
 | S4.4 | `sn/`: §3.4.4 validation sequence, §7.3 `/dispatch` with D-74 retry idempotency, §7.4 verdict generation + verification, §7.5 reservations, §7.6 `/verdict` updates with the transition table, §7.7 default tiers, RFC 9457 problems | dispatching the TV-001 envelope reproduces TV-002 **verdict 1 byte-identically** (708 B, exact sig); recipient-accept reproduces **verdict 2** (923 B) and mints the reservation; failure matrix maps every §3.4.4 item to its §7.8 code; deny→grant refused as `invalid-transition` |
+| S4.6 | Migration 0002 (D-209 Delivery-Record repair); `sn/forward.go` + `sn/delegation.go`: §3.4.2 chain append with §9.2 duties + D-51 loop prevention, §9.4 `delegation/1` requests + `/fulfill`, §9.5 source-side validation with the D-83 budget and dedup, §9.3 requester loop | the TV-004 **forwarded Envelope reproduces byte-identically** (1,669 B; the appended attestation IS TV-001's hop sig verbatim); the **delegation request reproduces** (1,095 B) minting the reservation on the requester's BS (D-82); the §9.5 walk answers the exact unsigned response, dedups replays without budget, alarms `medialet-mismatch` on splice; 9-case failure suite |
 | S4.5 | `bs/`: §6.6 RFC 9421 profile, the §8.2–8.4 upload resource with the D-77 transactional pipeline, D-27 BLAKE3 checkpoints, §8.5 failure taxonomy, §8.7 pusher loop under D-72 | all three TV-003 signature bases reproduce **byte-identically** and vector signatures verify; the transcript replays header-for-header (204/20, HEAD 200 with the exact `Upload-Expires`, 204/36 `verified`); digest-mismatch rolls back, hash-mismatch resets to 0 and recovers, restart re-derives the checkpoint; the pusher survives a lost 204 with PATCH offsets exactly [0, 20] |
 
 Register tail since the Stage 3 closing doc: **D-182–D-204** —
@@ -138,7 +139,34 @@ digest/offset mismatches realign via HEAD bounded by the attempt
 budget; `reservation-expired`/`-invalid` surface as a typed
 renegotiation error for the §7.6 grant→grant path; a lost *final* 204
 resolves at the negotiation layer (re-HEAD meets the consumed token,
-renegotiation answers `have`).
+renegotiation answers `have`) · D-209 Delivery-Record repair
+(migration 0002): §9.3 step 2 / §3.4.2 need the received Envelope's
+`created` and Hop Signature *value* to construct its attestation —
+D-53 promised "everything needed" but the 0001 schema kept only the
+kid; `envelopes_in` gains `envelope_created` and `hop_sig_value`,
+populated at ingest; pre-0002 rows backfill NULL and refuse to seed
+attestations with an explicit error · D-210 forwarding posture:
+`Forward(origin, envelope_id, to, forwarded_by, mode, automatic)` —
+Delegated carries received sources through with the root origin
+guaranteed present (the §9.2 minimum), Custody lists self first with
+received sources as fallback; D-51 loop prevention keys on the
+`automatic` flag (deliberate user forwards proceed); the forward is
+recorded in `dispatches`, making this domain a §9.5-capable source ·
+D-211 requester posture: reservations minted at request build
+(refused entries leave pending rows that expire into quarantine GC);
+credential selection per §9.3 step 2 incl. the own-origin
+construction; candidates = received sources ∩ chain members in
+order, default `[origin]`; refusal or transport failure falls
+through; exhaustion surfaces typed `ErrUnavailable` (the "request a
+resend" state) · D-212 source-side judgments: `medialet-mismatch` →
+**409** (an alarm, not a miss); attestation matching compares sig
+(normative) plus kid and created defensively against our records;
+reservation `max_size` ≠ Manifest size → request-level 400
+`malformed`; URN absent from the Manifest → per-entry refused
+`not-available`; budget = accepted `delegations` rows per (envelope,
+urn), constant default 10 (the per-mailbox `delegation_budget`
+override and the expiry refund sweep deferred); dedup on (requester,
+request_id) reconstructs the prior response from stored rows.
 
 ## 4. Environment recipe (sandbox)
 
@@ -160,9 +188,12 @@ shipping driver (one import swap) — D-191.
 `domain` binding check, kid self-verification wired on key-set load,
 24 h cache ceiling into `domain_docs`/`domain_keys` (D-33); TV-001's
 Domain Document fixture as the parsing anchor.
-**S4.4, S4.5 — done** (see table). **S4.6 (next)**: forwarding/delegation (TV-004) — §9 requester flow, delegation requests, source-side validation; consumes `sn` envelope machinery (hops, `fulfillment_sources`) and `bs.Pusher` for delegated pushes. Then:
-transactional PATCH (TV-003), consuming `reservations_in` (token-hash check, `hasher_state` BLAKE3 checkpoints per D-27/D-77) and `reservations_out` (push side, §7.5 D-72 pusher connection safety reusing the discovery address filter) · S4.6 forwarding/delegation (TV-004) ·
-S4.7 Client API + SSE · S4.8–11 client (Body viewer + JS sanitizer
+**S4.4–S4.6 — done** (see table); the server-to-server surface is
+complete and green against TV-001–TV-004. **S4.7 (next)**: Client
+API + SSE — the intra-domain client surface (D-79 freedom, Stage 3
+designs D-109–D-181), wiring `RecipientAccept` and
+`RequestFulfillment` behind it. Then: S4.8–11 client (Body viewer +
+JS sanitizer
 gated on TV-005 tree equality FIRST, then Inbox → composer →
 Deliveries → Media → identity/junk) · S4.12 guest+claim · S4.13
 two-domain demo (definition of done in Stage 3 Closing §5) · S4.14
@@ -172,7 +203,7 @@ conformance hardening + operator guide + NLnet.
 
 Per session: design/implementation presented with lettered judgment
 calls → Igor confirms explicitly → decisions frozen with sequential
-D-numbers (next free: **D-209**) → artifacts delivered as local
+D-numbers (next free: **D-213**) → artifacts delivered as local
 commits emitted as a `git format-patch` series against `origin/main`
 for Igor's review, `git am`, and push (D-196) → next-session pointer. Honesty rules: caught problems are
 surfaced, never patched silently; spec gaps go to the MEP queue;

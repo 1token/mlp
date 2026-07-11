@@ -8,9 +8,10 @@ import (
 
 // Media types of §7.2.
 const (
-	ctEnvelope = "application/mlp-envelope+json"
-	ctVerdict  = "application/mlp-verdict+json"
-	ctProblem  = "application/problem+json"
+	ctDelegation = "application/mlp-delegation+json"
+	ctEnvelope   = "application/mlp-envelope+json"
+	ctVerdict    = "application/mlp-verdict+json"
+	ctProblem    = "application/problem+json"
 )
 
 // Handler exposes the SN server-to-server API (§7.2) rooted at the
@@ -33,6 +34,21 @@ func Handler(s *SN) http.Handler {
 		w.Header().Set("Content-Type", ctVerdict)
 		w.WriteHeader(http.StatusOK)
 		w.Write(verdict)
+	})
+	mux.HandleFunc("POST /fulfill", func(w http.ResponseWriter, r *http.Request) {
+		body, prob := readBody(w, r, ctDelegation)
+		if prob != nil {
+			writeProblem(w, prob)
+			return
+		}
+		resp, prob := s.ProcessFulfill(r.Context(), body)
+		if prob != nil {
+			writeProblem(w, prob)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(resp)
 	})
 	mux.HandleFunc("POST /verdict", func(w http.ResponseWriter, r *http.Request) {
 		body, prob := readBody(w, r, ctVerdict)

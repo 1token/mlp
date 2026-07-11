@@ -35,6 +35,14 @@ type SN struct {
 
 	Now          func() time.Time
 	NewVerdictID func(t time.Time) string // default: random UUIDv7
+	// FulfillClient/FulfillEndpoint override the §9.3 POST transport
+	// and endpoint discovery (tests); production resolves via §5.
+	FulfillClient   *http.Client
+	FulfillEndpoint func(ctx context.Context, domain string) (string, error)
+	// NewEnvelopeID mints envelope identifiers for forwards (§3.4.2).
+	NewEnvelopeID func(t time.Time) string
+	// NewRequestID mints delegation request identifiers (§9.4).
+	NewRequestID func(t time.Time) string
 	// NewReservationSecret returns a capability token (1–512 chars)
 	// and a URL suffix appended to IngestBase.
 	NewReservationSecret func() (token, urlSuffix string)
@@ -323,12 +331,14 @@ func (s *SN) persistDispatch(ctx context.Context, pe *ParsedEnvelope, payload ma
 		`INSERT INTO envelopes_in (origin, envelope_id, medialet_ca, received_at,
 		   forwarded_by, hops_json, fulfillment_sources_json,
 		   author_sig_result, author_sig_kid, author_verified_at,
-		   hop_sig_result, hop_sig_kid, hop_verified_at)
-		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		   hop_sig_result, hop_sig_kid, hop_verified_at,
+		   envelope_created, hop_sig_value)
+		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		pe.Origin, pe.EnvelopeID, pe.ContentAddress, nowS,
 		nullable(pe.ForwardedBy), nullable(pe.HopsJSON), nullable(pe.FulfillSrcJSON),
 		"ok", kidOf(pe.AuthSig), nowS,
-		"ok", kidOf(pe.HopSig), nowS); err != nil {
+		"ok", kidOf(pe.HopSig), nowS,
+		pe.Created, sigValue(pe.HopSig)); err != nil {
 		return problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
 	}
 
@@ -563,4 +573,9 @@ func parseVerdictPayload(p map[string]any) (*ParsedVerdict, error) {
 		}
 	}
 	return pv, nil
+}
+
+func sigValue(sig map[string]any) string {
+	v, _ := sig["value"].(string)
+	return v
 }
