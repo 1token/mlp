@@ -25,4 +25,16 @@ jobs:
           test -z "$(gofmt -l .)"
           go vet ./...
           go test ./...
-  # client-checks (tsc --noEmit, JS sanitizer vs TV-005) activate in S4.8.
+  # client-checks activated in S4.8: the TV-005 gate + JSDoc types.
+  client-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: JS sanitizer vs TV-005 (tree equality + idempotence)
+        run: node client/test/run-tv005.js
+      - name: JSDoc types (tsc --noEmit, shipping client code)
+        run: |
+          npm install -g typescript@5.5
+          tsc --noEmit -p client/jsconfig.json
