@@ -43,6 +43,10 @@ type SN struct {
 	NewEnvelopeID func(t time.Time) string
 	// NewRequestID mints delegation request identifiers (§9.4).
 	NewRequestID func(t time.Time) string
+	// NewMedialetID mints Medialet identifiers for the composer.
+	NewMedialetID func(t time.Time) string
+	// DispatchEndpoint overrides §5 discovery of a target's /dispatch.
+	DispatchEndpoint func(ctx context.Context, domain string) (string, error)
 	// NewReservationSecret returns a capability token (1–512 chars)
 	// and a URL suffix appended to IngestBase.
 	NewReservationSecret func() (token, urlSuffix string)

@@ -62,4 +62,12 @@ export const api = {
   undo: (token) => call('POST', '/undo', { token }),
   /** @param {string} urn */
   accept: (urn) => call('POST', `/o/${encodeURIComponent(urn)}/accept`, {}),
+  /** @param {object} doc */
+  draftCreate: (doc) => call('POST', '/drafts', doc),
+  /** @param {string} id @param {object} doc */
+  draftSave: (id, doc) => call('PATCH', `/drafts/${id}`, doc),
+  /** @param {string} id */
+  draftSend: (id) => call('POST', `/drafts/${id}/send`),
+  /** @param {string} urn @param {number} size */
+  uploadDeclare: (urn, size) => call('POST', '/uploads', { urn, size }),
 };

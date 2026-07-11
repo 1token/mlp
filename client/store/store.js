@@ -15,7 +15,7 @@
 /**
  * @typedef {{ authenticated: boolean, mailboxId: number | null,
  *   inbox: { threads: ThreadRow[], loading: boolean, view: string },
- *   openThread: number | null,
+ *   openThread: number | 'compose' | null,
  *   undo: { token: string, label: string } | null }} State
  */
 

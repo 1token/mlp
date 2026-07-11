@@ -127,6 +127,12 @@ func (s *SN) signVerdict(ctx context.Context, payload map[string]any, now time.T
 
 // signingKey loads an sn-role signing key valid at now from own_keys.
 func (s *SN) signingKey(ctx context.Context, now time.Time) (kid string, priv ed25519.PrivateKey, err error) {
+	return s.keyWithRole(ctx, "sn", now)
+}
+
+// keyWithRole loads a valid own key carrying the role (D-13: the
+// domain holds and applies author keys too).
+func (s *SN) keyWithRole(ctx context.Context, role string, now time.Time) (kid string, priv ed25519.PrivateKey, err error) {
 	rows, err := s.DB.QueryContext(ctx, `SELECT kid, seed, roles, not_before, not_after FROM own_keys`)
 	if err != nil {
 		return "", nil, err
@@ -140,7 +146,7 @@ func (s *SN) signingKey(ctx context.Context, now time.Time) (kid string, priv ed
 			return "", nil, err
 		}
 		var rr []string
-		if json.Unmarshal([]byte(roles), &rr) != nil || !contains(rr, "sn") {
+		if json.Unmarshal([]byte(roles), &rr) != nil || !contains(rr, role) {
 			continue
 		}
 		e := discovery.KeyEntry{NotBefore: nb.String, NotAfter: na.String}

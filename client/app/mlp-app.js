@@ -12,6 +12,7 @@ import { api, ApiError } from '../store/api.js';
 import { connectLive } from '../store/live.js';
 import './mlp-inbox.js';
 import './mlp-thread.js';
+import './mlp-composer.js';
 
 export class MlpApp extends HTMLElement {
   connectedCallback() {
@@ -53,11 +54,17 @@ export class MlpApp extends HTMLElement {
       this.querySelector('#login')?.addEventListener('click', () => this.login());
       return;
     }
-    this.innerHTML = openThread === null
-      ? html`<main><h1>Inbox</h1><mlp-inbox></mlp-inbox></main>`
-      : html`<main><p><button id="back">← Inbox</button></p><mlp-thread thread-id="${openThread}"></mlp-thread></main>`;
+    if (openThread === 'compose') {
+      this.innerHTML = html`<main><p><button id="back">← Inbox</button></p><h1>Compose</h1><mlp-composer></mlp-composer></main>`;
+    } else if (openThread === null) {
+      this.innerHTML = html`<main><h1>Inbox <button id="compose">Compose</button></h1><mlp-inbox></mlp-inbox></main>`;
+    } else {
+      this.innerHTML = html`<main><p><button id="back">← Inbox</button></p><mlp-thread thread-id="${openThread}"></mlp-thread></main>`;
+    }
     this.querySelector('#back')?.addEventListener('click', () =>
       store.update('nav', { openThread: null }));
+    this.querySelector('#compose')?.addEventListener('click', () =>
+      store.update('nav', { openThread: 'compose' }));
     this.renderUndo();
   }
 

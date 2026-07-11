@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/zeebo/blake3"
+	"medialet.org/mlp/bs"
 	"medialet.org/mlp/sn"
 )
 
@@ -31,6 +32,7 @@ import (
 type Server struct {
 	DB  *sql.DB
 	SN  *sn.SN
+	BS  *bs.BS // the intra-domain upload door (D-135, one code path)
 	Hub *Hub
 	Now func() time.Time
 
@@ -188,5 +190,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/settings", s.handler(s.handleSettingsGet))
 	mux.HandleFunc("PATCH /api/v1/settings", s.handler(s.handleSettingsPatch))
 	s.registerThreadRoutes(mux)
+	s.registerComposeRoutes(mux)
 	return mux
 }

@@ -26,6 +26,7 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
+	"medialet.org/mlp/bs"
 	"medialet.org/mlp/core"
 	"medialet.org/mlp/discovery"
 	"medialet.org/mlp/sn"
@@ -117,7 +118,8 @@ func newAPI(t *testing.T, domain, localPart, seedHex string, clock *time.Time, c
 	}
 	hub := NewHub(db)
 	hub.Now = func() time.Time { return *clock }
-	return &Server{DB: db, SN: node, Hub: hub, Now: func() time.Time { return *clock }, PasswordIterations: 1000}
+	blob := &bs.BS{DB: db, Root: t.TempDir(), Now: func() time.Time { return *clock }}
+	return &Server{DB: db, SN: node, BS: blob, Hub: hub, Now: func() time.Time { return *clock }, PasswordIterations: 1000}
 }
 
 // login mints a session and returns an authenticated request helper.

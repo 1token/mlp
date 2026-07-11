@@ -232,7 +232,33 @@ func (b *BS) Patch(ctx context.Context, token, targetURI string, header func(str
 	if err != nil || reqOffset < 0 {
 		return 0, false, problemf(http.StatusConflict, "offset-mismatch", "malformed Upload-Offset (§8.4)")
 	}
+	return b.patchCore(ctx, res, claimed, reqOffset, body)
+}
 
+// LocalPatch is the intra-domain ingestion door (D-79/D-135: one
+// code path): the same transactional pipeline as Patch, minus the
+// RFC 9421 layer — authentication is the caller's business (the
+// Client API's session). The reservation still gates everything.
+func (b *BS) LocalPatch(ctx context.Context, token string, claimed []byte, reqOffset int64, body io.Reader) (offset int64, verified bool, prob *Problem) {
+	res, prob := b.loadReservation(ctx, token, b.now())
+	if prob != nil {
+		return 0, false, prob
+	}
+	return b.patchCore(ctx, res, claimed, reqOffset, body)
+}
+
+// LocalHead mirrors Head for the intra-domain door.
+func (b *BS) LocalHead(ctx context.Context, token string) (offset, length int64, prob *Problem) {
+	res, prob := b.loadReservation(ctx, token, b.now())
+	if prob != nil {
+		return 0, 0, prob
+	}
+	return res.offset, res.maxSize, nil
+}
+
+// patchCore is the §8.4 step 2+ transactional pipeline shared by the
+// federated and intra-domain doors.
+func (b *BS) patchCore(ctx context.Context, res *reservation, claimed []byte, reqOffset int64, body io.Reader) (offset int64, verified bool, prob *Problem) {
 	// One PATCH in flight per resource (D-30/D-76).
 	rsc := b.resource(res.tokenHash)
 	if !rsc.mu.TryLock() {
@@ -306,7 +332,7 @@ func (b *BS) Patch(ctx context.Context, token, targetURI string, header func(str
 		return 0, false, problemf(http.StatusUnprocessableEntity, "hash-mismatch",
 			"object does not verify against %s — re-push from 0 (§8.5, D-27)", res.urn)
 	}
-	if prob := b.finalize(ctx, res, now); prob != nil {
+	if prob := b.finalize(ctx, res, b.now()); prob != nil {
 		return newOffset, false, prob
 	}
 	rsc.hasher = nil

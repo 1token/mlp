@@ -2,7 +2,7 @@
 
 > Purpose: resume implementation in a fresh working session with zero
 > context loss. Read this first; everything else is referenced from it.
-> Updated at the S4.9 → S4.10 boundary (2026-07-11).
+> Updated at the S4.10 → S4.11 boundary (2026-07-11).
 
 ## 1. Project in one paragraph
 
@@ -34,7 +34,9 @@ sequential D-number; changes to frozen artifacts travel only as MEPs.
   (TV-005-gated §11 pipeline), `app/mlp-body-viewer.js`, `test/`.
   S4.9: `index.html` (CSP shell), `lib/html.js` (escaping tag +
   keyed reconciler), `store/` (store·api·live), `app/mlp-app.js`,
-  `app/mlp-inbox.js`, `app/mlp-thread.js`, `styles/`.
+  `app/mlp-inbox.js`, `app/mlp-thread.js`, `styles/`. S4.10:
+  `app/mlp-composer.js`; server `sn/compose.go`,
+  `clientapi/drafts.go`, `bs` LocalPatch/LocalHead.
 
 ## 3. Stage 4 state
 
@@ -49,6 +51,7 @@ sequential D-number; changes to frozen artifacts travel only as MEPs.
 | S4.7 | `clientapi/`: the D-170 conventions (dialect JSON, problem+json with client codes, HttpOnly session + X-MLP-Client CSRF, Idempotency-Key journal), password fallback (PBKDF2, RFC 7914 vectors), sessions CRUD, the D-132 SSE feed with Last-Event-ID resume, and the machinery-backed endpoints: `/o/{urn}/accept` (direct upgrade + §9.3 delegation), `/deliveries` + D-149 `/timeline`, `/objects/have`, `/quota`, `/settings` | one API call to accept a direct TV-001 delivery emits **TV-002 verdict 2 byte-identically** toward the origin; a forwarded TV-004 delivery triggers the delegation flow; SSE resumes exactly from the journal; idempotent replay re-executes nothing |
 | S4.8 | `client/lib/sanitizer.js` (§11 pipeline: two-tier removal, attribute/style/URL filtering, caps, REQUIRED idempotence fixpoint, degradation to derived text), `lib/derived-text.js` (§11.6 reference), `app/mlp-body-viewer.js` (the §11.7 shadow boundary with render-time urn→BS mapping), node harness, CI client-checks job activated | **all 14 TV-005 cases green under tree equality + idempotence on the first run**; caps degrade to text; tsc --noEmit clean over the shipping client code (D-117) |
 | S4.9 | Ingest materialization (`sn/materialize.go`: messages/threads per D-110, offered refs per §10.3, rollups); `clientapi/threads.go` (inbox+junk views, full thread, triage trio with D-129 undo, `/undo`); accept authorization closed + refs offered→expected; client shell/store/inbox/thread over the S4.7 API and SSE | TV-001 ingest materializes thread+message+refs; replies join parent threads, orphans root their own, re-deliveries dedup; quarantine lands in junk; undo restores exactly and expires at 30 s; non-recipient accept 404s; html`` escaping suite + TV-005 gate + tsc all green |
+| S4.10 | `sn/compose.go` (D-138 pre-flight, author/1 via `keyWithRole`, per-domain fan-out, dispatch + synchronous verdict recording, deliveries/refs-promised/sender-copy/timeline materialization); `clientapi/drafts.go` (drafts CRUD, hash-first `/uploads` declare + intra-domain PATCH over the shared `bs` core, `/drafts/{id}/send`); `app/mlp-composer.js` (autosave, attach-by-reference, the 10 s undo hold) | **composing Petra's draft reproduces the TV-001 Signed Medialet AND Signed Envelope byte-identically**, dispatches to a live target over HTTP, and records **TV-002 verdict 1 byte-identically** on return; the upload door resumes at the checkpoint and refuses corrupt digests; send gates on possession (409); two-domain fan-out = one delivery, two envelopes, both recipients materialized |
 | S4.5 | `bs/`: §6.6 RFC 9421 profile, the §8.2–8.4 upload resource with the D-77 transactional pipeline, D-27 BLAKE3 checkpoints, §8.5 failure taxonomy, §8.7 pusher loop under D-72 | all three TV-003 signature bases reproduce **byte-identically** and vector signatures verify; the transcript replays header-for-header (204/20, HEAD 200 with the exact `Upload-Expires`, 204/36 `verified`); digest-mismatch rolls back, hash-mismatch resets to 0 and recovers, restart re-derives the checkpoint; the pusher survives a lost 204 with PATCH offsets exactly [0, 20] |
 
 Register tail since the Stage 3 closing doc: **D-182–D-204** —
@@ -246,7 +249,30 @@ story (the S4.7 journal replays; zero client bookkeeping); the CSP
 grants style-src 'unsafe-inline' for sanitizer-permitted style
 *attributes* only — no <style> element survives §11 and app chrome
 escapes through html`` — everything else is 'none'/'self'; the undo
-bar's 30 s client timer mirrors the server TTL.
+bar's 30 s client timer mirrors the server TTL · D-225 S4.10 send
+posture: `Send()`'s first clock read stamps the Medialet, later
+reads stamp the dispatch (the TV-001 two-timestamp shape falls out
+naturally); pre-flight = recipient grammar + manifest caps +
+possession (D-135/D-84); the §11 body-conformance assert joins the
+deferred server render-form work; a failed target does not unsend
+the others (per-target outcomes; `dispatch.failed` timeline events);
+author/1 keys come from own_keys via the generalized `keyWithRole`
+(D-13: signing is the SN's act) · D-226 origin materialization: the
+sender's own copy is a messages row with `envelope_in` NULL (the
+0001 schema anticipated it), read=1, threaded by D-110 so replies
+land home; outbound refs are `promised` (§10.5, the CHECK demands
+it); one deliveries row per send job, dispatches linked by
+delivery_id per domain · D-227 intra-domain upload door: the same
+`bs` transactional core behind `LocalPatch`/`LocalHead` (one code
+path, the S3.3 Stage 4 note realized) with session auth replacing
+RFC 9421 (D-79); chunks self-digest (TLS+session carries transport
+integrity; the URN completion check stays absolute) and a
+client-supplied Content-Digest must match or 422; client-side
+BLAKE3 (file drag-in) waits for the vendored WASM in S4.11 — until
+then the composer attaches by reference only, and the upload lane
+is exercised by tests and non-browser clients · D-228 the 10 s undo
+hold is purely client-side (D-138: cheap, expected, the last moment
+before a signature); the server signs the instant it is told.
 
 ## 4. Environment recipe (sandbox)
 
@@ -268,14 +294,15 @@ shipping driver (one import swap) — D-191.
 `domain` binding check, kid self-verification wired on key-set load,
 24 h cache ceiling into `domain_docs`/`domain_keys` (D-33); TV-001's
 Domain Document fixture as the parsing anchor.
-**S4.4–S4.9 — done** (see table). **S4.10 (next)**: the composer
-(S3.3, D-133–D-139) — the origin-side send path the deliveries
-endpoints anticipate: drafts CRUD, intra-domain upload (tus, D-105
-store selection), pre-flight (D-138), author-sign → hop-sign →
-dispatch to the target SN, deliveries + dispatches(delivery_id)
-materialization, `have` attach-by-reference. Then: S4.11
-Deliveries/Media/identity/junk (+ server render form, D-165/D-21,
-bundles/sweep)
+**S4.4–S4.10 — done** (see table); the full loop — compose → sign →
+dispatch → verdict → accept → transfer — runs end-to-end on vector
+fixtures. **S4.11 (next)**: Deliveries/Media/identity/junk — the
+Deliveries lens UI over the S4.7 endpoints, the Media library
+(refs/tombstones/pins, blake3-wasm vendoring for the D-135 file
+door, D-105 store selection), identity (WebAuthn, correspondents),
+junk (D-165 derived-text-first payloads) + the deferred server
+render-form derivation (D-94) and D-21 classifier hook, bundles/
+sections/sweep triage refinement
 gated on TV-005 tree equality FIRST, then Inbox → composer →
 Deliveries → Media → identity/junk) · S4.12 guest+claim · S4.13
 two-domain demo (definition of done in Stage 3 Closing §5) · S4.14
@@ -285,7 +312,7 @@ conformance hardening + operator guide + NLnet.
 
 Per session: design/implementation presented with lettered judgment
 calls → Igor confirms explicitly → decisions frozen with sequential
-D-numbers (next free: **D-225**) → artifacts delivered as local
+D-numbers (next free: **D-229**) → artifacts delivered as local
 commits emitted as a `git format-patch` series against `origin/main`
 for Igor's review, `git am`, and push (D-196) → next-session pointer. Honesty rules: caught problems are
 surfaced, never patched silently; spec gaps go to the MEP queue;
