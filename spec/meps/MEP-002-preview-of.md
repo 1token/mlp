@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Status** | Draft (filed) |
+| **Status** | **Accepted** |
 | **Type** | Additive (optional member; no wire-version bump per D-101) |
-| **Filed** | 2026-07-06 |
+| **Filed** | 2026-07-06 · **Decided** | 2026-07-12 |
 | **Affects** | Spec §3.2.2 (Manifest Entries), §11.4 note; no registry changes |
 | **Origin** | D-158 — the pairing gap found in Stage 3 media-library design |
 
@@ -63,4 +63,11 @@ for card folding may accompany the reference client.
 
 ## Editor decision
 
-*Pending.*
+**Accepted** (2026-07-12). Rationale (D-40): the pairing is authored
+knowledge; leaving it to the D-158 markup heuristic makes libraries
+lie about what is saved. The member is descriptive only — the
+D-111/D-107 constraint is inherited verbatim and auto-grant continues
+to key on size alone (D-139). Violating members are ignored, never
+fatal, keeping old senders and sloppy tools harmless. Conformance
+lands as TV-007 (validation outcomes); the client card-folding case
+ships with the reference client's tests.

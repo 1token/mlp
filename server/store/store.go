@@ -38,7 +38,7 @@ func Migrate(db *sql.DB) error {
 	if err := db.QueryRow("PRAGMA user_version").Scan(&v); err != nil {
 		return err
 	}
-	files := []string{"migrations/0001_init.sql", "migrations/0002_forwarding.sql", "migrations/0003_render_form.sql"} // append in order
+	files := []string{"migrations/0001_init.sql", "migrations/0002_forwarding.sql", "migrations/0003_render_form.sql", "migrations/0004_preview_of.sql"} // append in order
 	for i, f := range files {
 		version := i + 1
 		if version <= v {

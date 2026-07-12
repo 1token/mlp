@@ -1,0 +1,142 @@
+{
+  "vector": "TV-007",
+  "mep": "MEP-002",
+  "description": "preview_of Manifest-validation outcomes (spec 3.2.2): violating members are ignored at ingest; entries otherwise stand.",
+  "cases": [
+    {
+      "name": "valid_pair",
+      "manifest": [
+        {
+          "urn": "urn:mlet:bdyqmtcz3p6uumnshb7hxkcpeoh56ipsuujp4tkzklc5bvpwwxwuauky",
+          "size": 5000000,
+          "type": "image/jpeg",
+          "available_until": "2026-08-01T00:00:00Z",
+          "name": "master.jpg"
+        },
+        {
+          "urn": "urn:mlet:bdyqbh7zcqz4ev6lkbwofy2rv3gtjvfnwrilpe5tc6gouurvt4dzvjcq",
+          "size": 180000,
+          "type": "image/jpeg",
+          "available_until": "2026-08-01T00:00:00Z",
+          "name": "master-preview.jpg",
+          "preview_of": "urn:mlet:bdyqmtcz3p6uumnshb7hxkcpeoh56ipsuujp4tkzklc5bvpwwxwuauky"
+        }
+      ],
+      "expected": [
+        {
+          "urn": "urn:mlet:bdyqmtcz3p6uumnshb7hxkcpeoh56ipsuujp4tkzklc5bvpwwxwuauky",
+          "size": 5000000,
+          "type": "image/jpeg",
+          "available_until": "2026-08-01T00:00:00Z",
+          "name": "master.jpg"
+        },
+        {
+          "urn": "urn:mlet:bdyqbh7zcqz4ev6lkbwofy2rv3gtjvfnwrilpe5tc6gouurvt4dzvjcq",
+          "size": 180000,
+          "type": "image/jpeg",
+          "available_until": "2026-08-01T00:00:00Z",
+          "name": "master-preview.jpg",
+          "preview_of": "urn:mlet:bdyqmtcz3p6uumnshb7hxkcpeoh56ipsuujp4tkzklc5bvpwwxwuauky"
+        }
+      ]
+    },
+    {
+      "name": "dangling_target",
+      "manifest": [
+        {
+          "urn": "urn:mlet:bdyqmtcz3p6uumnshb7hxkcpeoh56ipsuujp4tkzklc5bvpwwxwuauky",
+          "size": 5000000,
+          "type": "image/jpeg",
+          "available_until": "2026-08-01T00:00:00Z"
+        },
+        {
+          "urn": "urn:mlet:bdyqbh7zcqz4ev6lkbwofy2rv3gtjvfnwrilpe5tc6gouurvt4dzvjcq",
+          "size": 180000,
+          "type": "image/jpeg",
+          "available_until": "2026-08-01T00:00:00Z",
+          "preview_of": "urn:mlet:bdyqfgovxbcf6hhsgx7joyjjako6rmxc5vnvh7npoiuok6jvnymb7eza"
+        }
+      ],
+      "expected": [
+        {
+          "urn": "urn:mlet:bdyqmtcz3p6uumnshb7hxkcpeoh56ipsuujp4tkzklc5bvpwwxwuauky",
+          "size": 5000000,
+          "type": "image/jpeg",
+          "available_until": "2026-08-01T00:00:00Z"
+        },
+        {
+          "urn": "urn:mlet:bdyqbh7zcqz4ev6lkbwofy2rv3gtjvfnwrilpe5tc6gouurvt4dzvjcq",
+          "size": 180000,
+          "type": "image/jpeg",
+          "available_until": "2026-08-01T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "name": "chain",
+      "manifest": [
+        {
+          "urn": "urn:mlet:bdyqmtcz3p6uumnshb7hxkcpeoh56ipsuujp4tkzklc5bvpwwxwuauky",
+          "size": 5000000,
+          "type": "image/jpeg",
+          "available_until": "2026-08-01T00:00:00Z"
+        },
+        {
+          "urn": "urn:mlet:bdyqbh7zcqz4ev6lkbwofy2rv3gtjvfnwrilpe5tc6gouurvt4dzvjcq",
+          "size": 180000,
+          "type": "image/jpeg",
+          "available_until": "2026-08-01T00:00:00Z",
+          "preview_of": "urn:mlet:bdyqmtcz3p6uumnshb7hxkcpeoh56ipsuujp4tkzklc5bvpwwxwuauky"
+        },
+        {
+          "urn": "urn:mlet:bdyqj72zwdr3tvrqw54x7w35q6tt7jxbiutdnczdr25fcmid5mo5jaky",
+          "size": 20000,
+          "type": "image/jpeg",
+          "available_until": "2026-08-01T00:00:00Z",
+          "preview_of": "urn:mlet:bdyqbh7zcqz4ev6lkbwofy2rv3gtjvfnwrilpe5tc6gouurvt4dzvjcq"
+        }
+      ],
+      "expected": [
+        {
+          "urn": "urn:mlet:bdyqmtcz3p6uumnshb7hxkcpeoh56ipsuujp4tkzklc5bvpwwxwuauky",
+          "size": 5000000,
+          "type": "image/jpeg",
+          "available_until": "2026-08-01T00:00:00Z"
+        },
+        {
+          "urn": "urn:mlet:bdyqbh7zcqz4ev6lkbwofy2rv3gtjvfnwrilpe5tc6gouurvt4dzvjcq",
+          "size": 180000,
+          "type": "image/jpeg",
+          "available_until": "2026-08-01T00:00:00Z",
+          "preview_of": "urn:mlet:bdyqmtcz3p6uumnshb7hxkcpeoh56ipsuujp4tkzklc5bvpwwxwuauky"
+        },
+        {
+          "urn": "urn:mlet:bdyqj72zwdr3tvrqw54x7w35q6tt7jxbiutdnczdr25fcmid5mo5jaky",
+          "size": 20000,
+          "type": "image/jpeg",
+          "available_until": "2026-08-01T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "name": "self_reference",
+      "manifest": [
+        {
+          "urn": "urn:mlet:bdyqmtcz3p6uumnshb7hxkcpeoh56ipsuujp4tkzklc5bvpwwxwuauky",
+          "size": 5000000,
+          "type": "image/jpeg",
+          "available_until": "2026-08-01T00:00:00Z",
+          "preview_of": "urn:mlet:bdyqmtcz3p6uumnshb7hxkcpeoh56ipsuujp4tkzklc5bvpwwxwuauky"
+        }
+      ],
+      "expected": [
+        {
+          "urn": "urn:mlet:bdyqmtcz3p6uumnshb7hxkcpeoh56ipsuujp4tkzklc5bvpwwxwuauky",
+          "size": 5000000,
+          "type": "image/jpeg",
+          "available_until": "2026-08-01T00:00:00Z"
+        }
+      ]
+    }
+  ]
+}

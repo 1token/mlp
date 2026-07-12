@@ -337,7 +337,17 @@ func (s *SN) ProcessFulfill(ctx context.Context, raw []byte) ([]byte, *Problem) 
 			return nil, problemf(http.StatusBadRequest, "malformed",
 				"reservation max_size %d differs from the Manifest size %d (§9.5 step 4)", m.Reservation.MaxSize, size)
 		}
-		if until, err := time.Parse(time.RFC3339, availability[m.URN]); err != nil || now.After(until) {
+		// MEP-001 (§9.5): a custody holder is bound by the `until` it
+		// itself declared — validated against its own records (the
+		// dispatched envelopes it hop-signed). The window honored is
+		// the later of the Manifest available_until and our own
+		// declaration covering this URN; we never honor another
+		// party's declaration on our behalf.
+		window := availability[m.URN]
+		if own := s.ownDeclaredUntil(ctx, m.URN); own != "" && own > window {
+			window = own
+		}
+		if until, err := time.Parse(time.RFC3339, window); err != nil || now.After(until) {
 			outcomes = append(outcomes, FulfillOutcome{URN: m.URN, Status: "refused", Reason: "not-available"})
 			continue
 		}
@@ -563,4 +573,71 @@ func (s *SN) parseDelegation(ctx context.Context, raw []byte, now time.Time) (*p
 		return nil, problemf(http.StatusUnauthorized, "signature-invalid", "delegation/1: %v", err)
 	}
 	return pd, nil
+}
+
+// ownDeclaredUntil scans this domain's own dispatched envelopes for a
+// fulfillment_sources entry it declared about itself covering urn,
+// returning the latest such `until` ("" when never declared). This IS
+// the §9.5 "validated against its own records" clause: the only
+// windows we honor beyond the Manifest are ones we hop-signed.
+func (s *SN) ownDeclaredUntil(ctx context.Context, urn string) string {
+	rows, err := s.DB.QueryContext(ctx, `SELECT envelope_canonical FROM dispatches ORDER BY created`)
+	if err != nil {
+		return ""
+	}
+	defer rows.Close()
+	best := ""
+	for rows.Next() {
+		var canon []byte
+		if rows.Scan(&canon) != nil {
+			continue
+		}
+		var env struct {
+			Envelope struct {
+				Sources []struct {
+					Domain string   `json:"domain"`
+					URNs   []string `json:"urns"`
+					Until  string   `json:"until"`
+				} `json:"fulfillment_sources"`
+				Medialet struct {
+					Medialet struct {
+						Manifest []struct {
+							URN string `json:"urn"`
+						} `json:"manifest"`
+					} `json:"medialet"`
+				} `json:"medialet"`
+			} `json:"envelope"`
+		}
+		if json.Unmarshal(canon, &env) != nil {
+			continue
+		}
+		// An empty urns list scopes to "all Manifest URNs" OF THAT
+		// envelope — so the urn must appear in its Manifest before
+		// any window applies.
+		inManifest := false
+		for _, m := range env.Envelope.Medialet.Medialet.Manifest {
+			if m.URN == urn {
+				inManifest = true
+				break
+			}
+		}
+		if !inManifest {
+			continue
+		}
+		for _, src := range env.Envelope.Sources {
+			if src.Domain != s.Domain || src.Until == "" {
+				continue
+			}
+			covers := len(src.URNs) == 0
+			for _, u := range src.URNs {
+				if u == urn {
+					covers = true
+				}
+			}
+			if covers && src.Until > best {
+				best = src.Until
+			}
+		}
+	}
+	return best
 }

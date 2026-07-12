@@ -129,7 +129,12 @@ func (re *receivedEnvelope) chainMember(domain string) bool {
 // deliberate user forwards pass automatic=false. forwardedBy may be
 // "" for forwarder privacy (D-50). It returns the canonical Signed
 // Envelope for dispatching to the target's SN.
-func (s *SN) Forward(ctx context.Context, origin, envelopeID string, envelopeTo []string, forwardedBy string, mode ForwardMode, automatic bool) ([]byte, error) {
+// until is the MEP-001 custody-window declaration: non-empty on a
+// Custody forward, it becomes this domain's own `until` in its
+// fulfillment_sources entry — the forwarder's separately-attributed
+// promise, never touching the author's Manifest. Ignored for
+// Delegated forwards (a delegator makes no custody promise).
+func (s *SN) Forward(ctx context.Context, origin, envelopeID string, envelopeTo []string, forwardedBy string, mode ForwardMode, automatic bool, until string) ([]byte, error) {
 	now := s.now()
 	re, err := s.loadReceived(ctx, origin, envelopeID)
 	if err != nil {
@@ -176,7 +181,7 @@ func (s *SN) Forward(ctx context.Context, origin, envelopeID string, envelopeTo 
 	hops = append(hops, re.ownAttestation().asMap())
 
 	// fulfillment_sources per mode (§9.2 rule 2).
-	sources := s.forwardSources(re, mode)
+	sources := s.forwardSources(re, mode, until)
 
 	to := make([]any, len(envelopeTo))
 	for i, a := range envelopeTo {
@@ -237,7 +242,7 @@ func (s *SN) Forward(ctx context.Context, origin, envelopeID string, envelopeTo 
 // list carried through, with the root origin guaranteed present (the
 // minimum a delegating forwarder must list). Custody: this domain
 // first (nearest hop), received sources as fallback.
-func (s *SN) forwardSources(re *receivedEnvelope, mode ForwardMode) []any {
+func (s *SN) forwardSources(re *receivedEnvelope, mode ForwardMode, until string) []any {
 	var out []any
 	seen := map[string]bool{}
 	add := func(entry map[string]any) {
@@ -249,7 +254,11 @@ func (s *SN) forwardSources(re *receivedEnvelope, mode ForwardMode) []any {
 		out = append(out, entry)
 	}
 	if mode == Custody {
-		add(map[string]any{"domain": s.Domain})
+		self := map[string]any{"domain": s.Domain}
+		if until != "" {
+			self["until"] = until // MEP-001: our own offer window
+		}
+		add(self)
 	}
 	for _, src := range re.Sources {
 		add(src)

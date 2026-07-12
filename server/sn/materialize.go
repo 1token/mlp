@@ -72,11 +72,16 @@ func (s *SN) materialize(ctx context.Context, pe *ParsedEnvelope, targets []reci
 			continue // re-delivery of a known Medialet: one instance (D-110)
 		}
 		for _, me := range pe.Manifest {
+			// MEP-001: the stored offer window is the EFFECTIVE
+			// deadline — the latest of the Manifest available_until
+			// and every covering source's declared until. §10.3's
+			// expiry consumes exactly this value.
 			if _, err := tx.ExecContext(ctx,
-				`INSERT OR IGNORE INTO refs (mailbox_id, urn, medialet_ca, direction, state, name, size, type, available_until, updated_at)
-				 VALUES (?,?,?,'in','offered',?,?,?,?,?)`,
+				`INSERT OR IGNORE INTO refs (mailbox_id, urn, medialet_ca, direction, state, name, size, type, available_until, preview_of, updated_at)
+				 VALUES (?,?,?,'in','offered',?,?,?,?,?,?)`,
 				t.mailboxID, me.URN, pe.ContentAddress,
-				nullable(me.Name), me.Size, me.Type, me.AvailableUntil, nowS); err != nil {
+				nullable(me.Name), me.Size, me.Type,
+				effectiveDeadline(me, pe.Sources), nullable(me.PreviewOf), nowS); err != nil {
 				return problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
 			}
 		}
@@ -164,4 +169,28 @@ func boolTo01(b bool) int {
 		return 1
 	}
 	return 0
+}
+
+// effectiveDeadline is the MEP-001 rule: the latest of the Manifest
+// available_until and the `until` of every listed source covering the
+// URN. RFC 3339 UTC strings compare lexicographically.
+func effectiveDeadline(me ManifestEntry, sources []SourceEntry) string {
+	deadline := me.AvailableUntil
+	for _, src := range sources {
+		if src.Until != "" && src.Covers(me.URN) && src.Until > deadline {
+			deadline = src.Until
+		}
+	}
+	return deadline
+}
+
+// ExpireOffers fires the §10.3 offered→unavailable(expired-remote)
+// transition for every offer whose effective deadline has passed —
+// the sweep the Client API runs lazily on list reads.
+func (s *SN) ExpireOffers(ctx context.Context, now time.Time) error {
+	_, err := s.DB.ExecContext(ctx,
+		`UPDATE refs SET state='unavailable', cause='expired-remote', updated_at=?
+		 WHERE state='offered' AND available_until < ?`,
+		now.Format(time.RFC3339), now.Format(time.RFC3339))
+	return err
 }

@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Status** | Draft (filed) |
+| **Status** | **Accepted** |
 | **Type** | Additive (optional member; no wire-version bump per D-101) |
-| **Filed** | 2026-07-06 |
+| **Filed** | 2026-07-06 · **Decided** | 2026-07-12 |
 | **Affects** | Spec §3.4.1 (`fulfillment_sources`), §9.5, §10.3; no registry changes (member additions are spec-governed per D-100) |
 | **Origin** | D-126 — surfaced by the editor's day-40 correction (Stage 3, S3.1) |
 
@@ -80,4 +80,11 @@ effective-deadline rule; a validation case for the §9.5 sentence
 
 ## Editor decision
 
-*Pending.*
+**Accepted** (2026-07-12). Rationale (D-40): the day-40 correction
+(D-126) exposed a real provenance loss — the v1 compose-new workaround
+discards the author's signature exactly where custody forwarding
+exists to preserve it. The member is additive, binds only its
+declarant (the no-extension sentence is the load-bearing line), and
+degrades conservatively under D-43 rule 5. Conformance lands as
+TV-006 with the §10.3 effective-deadline and §9.5 own-record cases;
+frozen vectors stay untouched.

@@ -2,7 +2,7 @@
 
 > Purpose: resume implementation in a fresh working session with zero
 > context loss. Read this first; everything else is referenced from it.
-> Updated at the S4.11 → S4.12 boundary (2026-07-11).
+> Updated at the MEP-integration → S4.12 boundary (2026-07-12).
 
 ## 1. Project in one paragraph
 
@@ -17,7 +17,7 @@ sequential D-number; changes to frozen artifacts travel only as MEPs.
 
 ## 2. Where everything lives (this repository)
 
-- `spec/MLP-Core-Specification-0.1-draft-01.md` — **frozen** (D-108).
+- `spec/MLP-Core-Specification-0.1-draft-02.md` — **frozen** (D-108).
 - `spec/meps/` — MEP-001 (fulfillment-window) and MEP-002
   (`preview_of`), both **Draft — awaiting Igor's editor decision**
   (open action). Build to the frozen spec until accepted (D-179).
@@ -53,6 +53,7 @@ sequential D-number; changes to frozen artifacts travel only as MEPs.
 | S4.9 | Ingest materialization (`sn/materialize.go`: messages/threads per D-110, offered refs per §10.3, rollups); `clientapi/threads.go` (inbox+junk views, full thread, triage trio with D-129 undo, `/undo`); accept authorization closed + refs offered→expected; client shell/store/inbox/thread over the S4.7 API and SSE | TV-001 ingest materializes thread+message+refs; replies join parent threads, orphans root their own, re-deliveries dedup; quarantine lands in junk; undo restores exactly and expires at 30 s; non-recipient accept 404s; html`` escaping suite + TV-005 gate + tsc all green |
 | S4.10 | `sn/compose.go` (D-138 pre-flight, author/1 via `keyWithRole`, per-domain fan-out, dispatch + synchronous verdict recording, deliveries/refs-promised/sender-copy/timeline materialization); `clientapi/drafts.go` (drafts CRUD, hash-first `/uploads` declare + intra-domain PATCH over the shared `bs` core, `/drafts/{id}/send`); `app/mlp-composer.js` (autosave, attach-by-reference, the 10 s undo hold) | **composing Petra's draft reproduces the TV-001 Signed Medialet AND Signed Envelope byte-identically**, dispatches to a live target over HTTP, and records **TV-002 verdict 1 byte-identically** on return; the upload door resumes at the checkpoint and refuses corrupt digests; send gates on possession (409); two-domain fan-out = one delivery, two envelopes, both recipients materialized |
 | S4.11 | `render/`: the Go §11 pipeline over x/net/html (spec-compliant HTML5 parsing) — sanitizer, §11.6 derived text, D-132 snippet; migration 0003 (`render_degraded`); derivation at ingest + send, rollup snippet, render-form thread payloads, the D-21 classifier hook; media library (cards, pin/unpin, owner delete, hardened object serving, raw-medialet endpoint), the `OnVerified` seam flipping expected→available; junk release/block with the correspondents ledger; client deliveries lens, media cards, nav tabs, junk actions | **the Go sanitizer passes all 14 TV-005 cases first run** — the third implementation through the corpus; the classifier demotes on derived text and a released sender outranks it; the media lifecycle walks §10.3 end-to-end offered→…→unavailable(deleted) |
+| MEP-001 + MEP-002 | Both accepted (editor decision 2026-07-12). Spec → **draft-02** (rename + changelog): §3.4.1 `until`, §10.3 effective offer deadline, §9.5 declarant binding (MEP-001); §3.2.2 `preview_of` (MEP-002). Migration 0004 (`refs.preview_of`). TV-006 (custody `until` past the Manifest window) + TV-007 (preview_of validation outcomes) with committed generators. Go: strict `until` validation + parsed `Sources`, `effectiveDeadline` into `refs.available_until`, `ExpireOffers` lazy sweep, `Forward(…until)` custody param, `ownDeclaredUntil` §9.5 own-record binding, two-pass order-independent preview_of strip (ingest + compose parity), media fold hint; client media card folding | **TV-006 custody envelope byte-identical** (1728 canonical bytes); the effective deadline is the declared `until`, not the passed Manifest date; the source honors exactly its own hop-signed window (will-push inside, resend past); TV-007's four outcomes reproduce; frozen TV-001–005 untouched |
 | S4.5 | `bs/`: §6.6 RFC 9421 profile, the §8.2–8.4 upload resource with the D-77 transactional pipeline, D-27 BLAKE3 checkpoints, §8.5 failure taxonomy, §8.7 pusher loop under D-72 | all three TV-003 signature bases reproduce **byte-identically** and vector signatures verify; the transcript replays header-for-header (204/20, HEAD 200 with the exact `Upload-Expires`, 204/36 `verified`); digest-mismatch rolls back, hash-mismatch resets to 0 and recovers, restart re-derives the checkpoint; the pusher survives a lost 204 with PATCH offsets exactly [0, 20] |
 
 Register tail since the Stage 3 closing doc: **D-182–D-204** —
@@ -343,7 +344,7 @@ conformance hardening + operator guide + NLnet.
 
 Per session: design/implementation presented with lettered judgment
 calls → Igor confirms explicitly → decisions frozen with sequential
-D-numbers (next free: **D-234**) → artifacts delivered as local
+D-numbers (next free: **D-237**) → artifacts delivered as local
 commits emitted as a `git format-patch` series against `origin/main`
 for Igor's review, `git am`, and push (D-196) → next-session pointer. Honesty rules: caught problems are
 surfaced, never patched silently; spec gaps go to the MEP queue;

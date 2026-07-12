@@ -12,7 +12,7 @@ import { api, ApiError } from '../store/api.js';
 
 /**
  * @typedef {{ urn: string, name: string, size: number, type: string,
- *   held: boolean, pinned: boolean, states: Record<string, number>,
+ *   held: boolean, pinned: boolean, preview_of?: string, states: Record<string, number>,
  *   deliveries: number }} MediaCard
  */
 
@@ -21,6 +21,30 @@ export class MlpMedia extends HTMLElement {
     super();
     /** @type {MediaCard[]} */
     this.cards = [];
+  }
+
+  /**
+   * Fold preview cards into their master (MEP-002): a card whose
+   * preview_of names another card in view is attached to that master
+   * rather than shown as an independent asset.
+   * @param {MediaCard[]} cards
+   * @returns {{ master: MediaCard, preview: MediaCard | null }[]}
+   */
+  fold(cards) {
+    const byURN = new Map(cards.map((c) => [c.urn, c]));
+    /** @type {Set<string>} */
+    const folded = new Set();
+    /** @type {{ master: MediaCard, preview: MediaCard | null }[]} */
+    const out = [];
+    for (const c of cards) {
+      if (c.preview_of && byURN.has(c.preview_of)) { folded.add(c.urn); }
+    }
+    for (const c of cards) {
+      if (folded.has(c.urn)) continue;
+      const preview = cards.find((p) => p.preview_of === c.urn) ?? null;
+      out.push({ master: c, preview });
+    }
+    return out;
   }
 
   connectedCallback() { this.load(); }
@@ -42,19 +66,23 @@ export class MlpMedia extends HTMLElement {
     }
     this.innerHTML = html`<div class="media-list" role="list"></div>`;
     const list = /** @type {HTMLElement} */ (this.querySelector('.media-list'));
-    for (const c of this.cards) {
+    for (const { master: c, preview } of this.fold(this.cards)) {
       const row = document.createElement('div');
       row.className = 'thread-row';
       row.setAttribute('role', 'listitem');
       const states = Object.entries(c.states)
         .map(([st, n]) => html`<span class="chip">${n} ${st}</span>`).join(' ');
+      const previewNote = preview
+        ? html`<span class="chip">preview ${preview.size} B</span>` : '';
       row.innerHTML = html`
         <span class="who">${c.name || c.urn.slice(9, 21)}</span>
         <span class="subject">${c.size} B · ${c.deliveries} deliveries ${c.held ? '· held' : ''}</span>
         <span class="chips"></span>
         <span class="actions"></span>`;
+      const chipHost = row.querySelector('.chips');
+      if (chipHost && previewNote) chipHost.insertAdjacentHTML('afterbegin', previewNote);
       const chips = row.querySelector('.chips');
-      if (chips) chips.innerHTML = states;
+      if (chips) chips.insertAdjacentHTML('beforeend', states);
       const actions = /** @type {HTMLElement} */ (row.querySelector('.actions'));
       if (c.states.available || c.states.pinned) {
         const pin = document.createElement('button');

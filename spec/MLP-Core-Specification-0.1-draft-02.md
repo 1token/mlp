@@ -2,13 +2,19 @@
 
 | | |
 |---|---|
-| **Version** | MLP/0.1 — document revision draft-01 (Stage 2 freeze candidate) |
+| **Version** | MLP/0.1 — document revision draft-02 (draft-01 + MEP-001, MEP-002) |
 | **Status** | Pre-1.0, declared unstable (D-101); all changes via MEP (D-40) |
 | **Editor** | Igor (sole editor through 1.0, per D-40) |
-| **Date** | 2026-07-05 |
+| **Date** | 2026-07-12 |
 | **License** | CC-BY 4.0 (D-39) |
-| **Conformance** | Test vectors TV-001–TV-005 with committed generators (Annex C) |
+| **Conformance** | Test vectors TV-001–TV-007 with committed generators (Annex C) |
 | **Decision register** | Stage 1 Closing Document (D-01–D-42); Stage 2 Closing Document (D-43 onward) |
+
+> **Changelog.** draft-02 (2026-07-12): MEP-001 (fulfillment-window
+> override — §3.4.1 `until`, §10.3 effective offer deadline, §9.5
+> declarant binding) and MEP-002 (`preview_of` Manifest member —
+> §3.2.2) accepted and applied; conformance grows TV-006 and TV-007.
+> draft-01 (2026-07-05): the Stage 2 freeze (D-108).
 
 **Contents**
 
@@ -294,6 +300,7 @@ from `addr` MUST trigger caution UI).
 | `name` | string | OPTIONAL | Display filename, 1–255 code points. A display string only: receivers MUST NOT interpret it as a filesystem path; path separators and traversal sequences carry no meaning and clients MUST neutralize them on save (D-47). |
 | `available_until` | string | REQUIRED | RFC 3339 UTC. The sender side's retention promise for this object (D-19); delegated fulfillment is honored only within this window (D-23). |
 | `segments` | array of string | OPTIONAL | Per-segment digests over fixed 16 MiB segments for early-abort verification (D-27); exact digest encoding is defined in Section 8. |
+| `preview_of` | string | OPTIONAL | The `urn` of another entry **in the same Manifest** for which this entry is a reduced-fidelity preview (MEP-002). Constraints: the referenced `urn` MUST be present in the Manifest; an entry carrying `preview_of` MUST NOT itself be the target of any `preview_of` (no chains); self-reference is forbidden. A violating member is **ignored** at ingest validation (the entry otherwise stands). Purely descriptive — never a policy input (D-111/D-107 inherited; auto-grant continues to key on `size` alone, D-139). |
 
 #### 3.2.3 Constraints
 
@@ -380,7 +387,7 @@ to clients (D-03).
 | `origin` | string | REQUIRED | The dispatching SN's domain (A-label form for IDN domains). The Hop Signature verifies against this domain's `sn`-role keys. |
 | `envelope_to` | array of string | REQUIRED | Non-empty array of bare Addresses (no display names — routing data only). All entries MUST share a single domain: the target domain. Maximum **128** entries (D-52). Bcc semantics: one Envelope per Bcc recipient, naming only that recipient, even when several Bcc recipients share a domain (D-03). |
 | `forwarded_by` | string | OPTIONAL | The Address of the mailbox whose action caused this dispatch, when the dispatch results from a forward. Supplies the "received via B" delivery metadata of D-04. A forwarding SN MAY omit it for forwarder privacy. Absent on original dispatches. (D-50) |
-| `fulfillment_sources` | array of object | OPTIONAL | Each `{ "domain": <string, REQUIRED>, "urns": <array of string, OPTIONAL — absent means all Manifest URNs> }`, in preference order (nearest hop first, D-24). Absent means the single source `origin` — the direct-dispatch case. An SN dispatching a delegated forward MUST list at least the custody-holding sources it knows, the root origin at minimum (D-22–D-24). |
+| `fulfillment_sources` | array of object | OPTIONAL | Each `{ "domain": <string, REQUIRED>, "urns": <array of string, OPTIONAL — absent means all Manifest URNs>, "until": <string, OPTIONAL, RFC 3339 UTC — MEP-001> }`, in preference order (nearest hop first, D-24). `until` is the declaring source's own offer window for the URNs this entry covers: its promise that it will honor grants (as enveloping origin, §7.6) or delegation requests (§9.4) for those objects until the stated time. Absent means the single source `origin` — the direct-dispatch case. An SN dispatching a delegated forward MUST list at least the custody-holding sources it knows, the root origin at minimum (D-22–D-24). |
 | `hops` | array of Hop Attestation | OPTIONAL | The signature chain, oldest first (§3.4.2). Absent on original dispatches. Maximum **32** entries (D-51). |
 | `medialet` | object | REQUIRED | The Signed Medialet (§3.3), unchanged. |
 
@@ -1658,6 +1665,12 @@ answer the codes shown):
 5. Local policy MAY refuse (`policy`) — a source is never obligated to
    fulfill.
 
+A source honoring requests as a custody holder is bound by the `until`
+**it itself declared** in its dispatch (validated against its own
+records); a root origin remains bound by its own Manifest
+`available_until`. **No party's declaration ever extends another
+party's obligations** (MEP-001).
+
 **Budget accounting** (D-83): per (root `envelope_id`, `urn`);
 default **10** (D-23); *accepted* requests consume budget at acceptance;
 a source MAY refund budget when a reservation expires unused. Exhaustion
@@ -1846,7 +1859,7 @@ Normative transitions — anything not listed is forbidden:
 | From | To | Trigger |
 |---|---|---|
 | `offered` | `expected` | Recipient accepts → `defer → grant` upgrade (§7.6) or delegation request (§9.3). |
-| `offered` | `unavailable(expired-remote)` | The Manifest `available_until` passes unaccepted. |
+| `offered` | `unavailable(expired-remote)` | The **effective offer deadline** passes unaccepted — the latest of the Manifest `available_until` and the `until` of every listed fulfillment source covering the URN (MEP-001). Absent any `until`, the Manifest value governs. |
 | `offered` | `unavailable(declined)` | Recipient declines, or policy `deny` supersedes. |
 | `expected` | `available` | Verified ingest completes (§8.4), or the object was already `live` (`have`). |
 | `expected` | `offered` | The Reservation expired unused and the sender window still stands; otherwise `unavailable(expired-remote)`. |

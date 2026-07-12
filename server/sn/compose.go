@@ -122,12 +122,16 @@ func (s *SN) Send(ctx context.Context, mailboxID int64, addr string, d *DraftCon
 		medialet["displayed_to"] = disp
 	}
 	if len(d.Manifest) > 0 {
+		stripInvalidPreviews(d.Manifest) // MEP-002: same rule as ingest
 		man := make([]any, len(d.Manifest))
 		for i, me := range d.Manifest {
 			e := map[string]any{"urn": me.URN, "size": me.Size, "type": me.Type,
 				"available_until": me.AvailableUntil}
 			if me.Name != "" {
 				e["name"] = me.Name
+			}
+			if me.PreviewOf != "" {
+				e["preview_of"] = me.PreviewOf
 			}
 			man[i] = e
 		}
@@ -343,4 +347,26 @@ func (s *SN) medialetID(t time.Time) string {
 		return s.NewMedialetID(t)
 	}
 	return randomUUIDv7(t)
+}
+
+// stripInvalidPreviews applies the MEP-002 constraints to a draft's
+// Manifest before signing (dangling / chain / self-reference members
+// are dropped) — the composer never signs what ingest would ignore.
+func stripInvalidPreviews(entries []ManifestEntry) {
+	declared := make(map[string]int, len(entries))
+	original := make([]string, len(entries))
+	for i, me := range entries {
+		declared[me.URN] = i
+		original[i] = me.PreviewOf
+	}
+	for i := range entries {
+		pv := original[i]
+		if pv == "" {
+			continue
+		}
+		target, present := declared[pv]
+		if !present || pv == entries[i].URN || original[target] != "" {
+			entries[i].PreviewOf = ""
+		}
+	}
 }

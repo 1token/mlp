@@ -41,6 +41,27 @@ type ManifestEntry struct {
 	Type           string
 	Name           string
 	AvailableUntil string
+	PreviewOf      string // MEP-002; "" when absent or ignored-as-violating
+}
+
+// SourceEntry is one parsed fulfillment_sources entry (MEP-001).
+type SourceEntry struct {
+	Domain string
+	URNs   []string // empty = all Manifest URNs
+	Until  string   // "" = no declared window
+}
+
+// Covers reports whether the entry's URN scope includes urn.
+func (e SourceEntry) Covers(urn string) bool {
+	if len(e.URNs) == 0 {
+		return true
+	}
+	for _, u := range e.URNs {
+		if u == urn {
+			return true
+		}
+	}
+	return false
 }
 
 // ParsedEnvelope is a Signed Envelope that passed §3.4.4 items 1–5
@@ -68,6 +89,7 @@ type ParsedEnvelope struct {
 	MedialetTime   string // medialet.created
 	BodyContent    string
 	Derived        *render.Result // §11 derivation (D-94), set at ingest/send
+	Sources        []SourceEntry  // parsed fulfillment_sources (MEP-001)
 	Manifest       []ManifestEntry
 	HopsJSON       string // verbatim-equivalent JSON of hops, "" when absent
 	ForwardedBy    string
@@ -225,17 +247,30 @@ func ParseEnvelope(raw []byte, now time.Time, localDomain string) (*ParsedEnvelo
 			if !ok || validDomain(d) != nil {
 				return nil, malformed("fulfillment_sources entry lacks a valid domain (§3.4.1)")
 			}
+			entry := SourceEntry{Domain: d}
 			if u, present := src["urns"]; present {
 				urns, ok := u.([]any)
 				if !ok {
 					return nil, malformed("fulfillment_sources urns is not an array (§3.4.1)")
 				}
 				for _, uu := range urns {
-					if _, ok := uu.(string); !ok {
+					us, ok := uu.(string)
+					if !ok {
 						return nil, malformed("fulfillment_sources urn is not a string (§3.4.1)")
 					}
+					entry.URNs = append(entry.URNs, us)
 				}
 			}
+			// MEP-001: the declaring source's own offer window —
+			// a known member, validated strictly when present.
+			if u, present := src["until"]; present {
+				us, ok := u.(string)
+				if !ok || !rfc3339utc(us) {
+					return nil, malformed("fulfillment_sources until is not RFC 3339 UTC (§3.4.1, MEP-001)")
+				}
+				entry.Until = us
+			}
+			pe.Sources = append(pe.Sources, entry)
 		}
 		b, _ := json.Marshal(fs)
 		pe.FulfillSrcJSON = string(b)
@@ -381,6 +416,17 @@ func (pe *ParsedEnvelope) validateMedialet() *Problem {
 		pe.BodyContent = c
 	}
 
+	if prob := validateManifest(pe, m); prob != nil {
+		return prob
+	}
+	return nil
+}
+
+// validateManifest applies §3.2.2/§3.2.3 to the medialet's manifest,
+// including the MEP-002 preview_of constraints (violating members
+// ignored, entries standing). Exposed within the package so the
+// TV-007 conformance test anchors on the real validator.
+func validateManifest(pe *ParsedEnvelope, m map[string]any) *Problem {
 	if man, present := m["manifest"]; present {
 		list, ok := man.([]any)
 		if !ok {
@@ -439,7 +485,38 @@ func (pe *ParsedEnvelope) validateMedialet() *Problem {
 					}
 				}
 			}
+			if pv, present := e["preview_of"]; present {
+				// MEP-002: type-checked here; the relational
+				// constraints run after the loop, and violations
+				// IGNORE the member (the entry stands).
+				pvs, ok := pv.(string)
+				if !ok {
+					return malformed("preview_of is not a string (§3.2.2, MEP-002)")
+				}
+				me.PreviewOf = pvs
+			}
 			pe.Manifest = append(pe.Manifest, me)
+		}
+		// MEP-002 relational constraints, second pass: a violating
+		// preview_of (dangling target, chain, self-reference) is
+		// ignored — stripped from the parsed entry, never fatal.
+		// Constraints read the DECLARED members (a pre-strip
+		// snapshot), so outcomes are order-independent.
+		declared := make(map[string]int, len(pe.Manifest))
+		original := make([]string, len(pe.Manifest))
+		for i, me := range pe.Manifest {
+			declared[me.URN] = i
+			original[i] = me.PreviewOf
+		}
+		for i := range pe.Manifest {
+			pv := original[i]
+			if pv == "" {
+				continue
+			}
+			target, present := declared[pv]
+			if !present || pv == pe.Manifest[i].URN || original[target] != "" {
+				pe.Manifest[i].PreviewOf = "" // ignored (§3.2.2, MEP-002)
+			}
 		}
 	}
 	return nil

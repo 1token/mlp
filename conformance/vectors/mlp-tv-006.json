@@ -1,0 +1,91 @@
+{
+  "vector": "TV-006",
+  "mep": "MEP-001",
+  "description": "Custody forward carrying the declarant's own offer window (until) past the Manifest available_until; the effective offer deadline at the recipient is the later of the two; the custody holder is bound by exactly what it declared (spec 9.5).",
+  "signed_custody_envelope": {
+    "envelope": {
+      "mlp": "0.1",
+      "envelope_id": "019f558e-0a80-7f71-90df-a35612301a22",
+      "created": "2026-07-12T09:00:00Z",
+      "origin": "target.example",
+      "envelope_to": [
+        "carol@final.example"
+      ],
+      "forwarded_by": "novak@target.example",
+      "fulfillment_sources": [
+        {
+          "domain": "target.example",
+          "until": "2026-09-01T00:00:00Z"
+        },
+        {
+          "domain": "origin.example"
+        }
+      ],
+      "hops": [
+        {
+          "origin": "origin.example",
+          "envelope_id": "019f2c92-2c88-7c16-a1fe-4548abf07edd",
+          "created": "2026-07-04T10:00:05Z",
+          "kid": "bdyqnbqeil3qzkhtocxe77a7j5qactmknmkncicd6k2glhgyrbvnzs5a",
+          "sig": "TiQzJ3TUxh0bpuBiLxzbOXp3Kp5WWfGR1MMDGMCWs0dG3RuFEwG3KjgWUOUwA9yLkJenGbwKwAPPR0bfjgigDQ"
+        }
+      ],
+      "medialet": {
+        "medialet": {
+          "mlp": "0.1",
+          "id": "019f2c92-1900-7b0f-8f1e-30c7d7d77f8c",
+          "author": "petra@origin.example",
+          "subject": "TV-001 sample delivery",
+          "created": "2026-07-04T10:00:00Z",
+          "displayed_to": [
+            {
+              "addr": "novak@target.example",
+              "name": "Novák Family"
+            }
+          ],
+          "body": {
+            "profile": "mlp-html/1",
+            "content": "<p>Hello from TV-001. File: <a href=\"urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y\">sample.txt</a></p>"
+          },
+          "manifest": [
+            {
+              "urn": "urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y",
+              "size": 36,
+              "type": "text/plain",
+              "name": "sample.txt",
+              "available_until": "2026-07-11T10:00:00Z"
+            }
+          ]
+        },
+        "signature": {
+          "mlp_sig": "author/1",
+          "protected": {
+            "kid": "bdyqljzaynjgp5mecdwrg6tk4xthzykaup2iua3jnsogerknzmlsizmi",
+            "alg": "ed25519",
+            "created": "2026-07-04T10:00:00Z"
+          },
+          "value": "kJ5A09wU5TcBFjxgWmTWA6QpK_BFaJk2usG0LJ1Nlqhd80jSGKwQ1Zr77YI7aXbG9b5CJ6h30C8u9EUJ8T39CA"
+        }
+      }
+    },
+    "signature": {
+      "mlp_sig": "hop/1",
+      "protected": {
+        "kid": "bdyqdn2sf4ms6wvldnq7ieuwkd6lmzk4kk7esux3od27t5v73arcinga",
+        "alg": "ed25519",
+        "created": "2026-07-12T09:00:00Z"
+      },
+      "value": "9FWygmSf0_pEco3qIEFpyCAlx8Ghye18nvjCaqOab8c3LkUdBu038ZwGFLHyG_DiZakvbjOBYFpBvqj9jLvpDQ"
+    }
+  },
+  "expectations": {
+    "manifest_available_until": "2026-07-11T10:00:00Z",
+    "declared_until": "2026-09-01T00:00:00Z",
+    "declarant": "target.example",
+    "effective_deadline": "2026-09-01T00:00:00Z",
+    "offered_ref_survives_at": "2026-07-13T00:00:00Z",
+    "offered_ref_expires_at": "2026-09-02T00:00:00Z",
+    "media_urn": "urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y",
+    "medialet_ca": "urn:mlet:bdyqhmtxg343efvdn34cvh4xacxbfa7keroljucjvcpvg63rtkvhmlqa"
+  }
+}

@@ -29,6 +29,7 @@ func (s *Server) registerThreadRoutes(mux *http.ServeMux) {
 }
 
 func (s *Server) handleThreads(w http.ResponseWriter, r *http.Request, mailbox int64) *problem {
+	s.SN.ExpireOffers(r.Context(), s.now()) // lazy §10.3 sweep (MEP-001 effective deadlines)
 	junk := 0
 	if r.URL.Query().Get("view") == "junk" {
 		junk = 1
@@ -122,6 +123,7 @@ func (s *Server) mediaChips(r *http.Request, threadID int64) (map[string]int64, 
 // proven pipeline (server-side render-form derivation arrives with
 // its S4.11 consumers).
 func (s *Server) handleThread(w http.ResponseWriter, r *http.Request, mailbox int64) *problem {
+	s.SN.ExpireOffers(r.Context(), s.now())
 	id, prob := s.ownThread(r, mailbox)
 	if prob != nil {
 		return prob

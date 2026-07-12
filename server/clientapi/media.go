@@ -30,9 +30,10 @@ func (s *Server) registerMediaRoutes(mux *http.ServeMux) {
 // handleMediaList groups the mailbox's refs by URN (D-156: one row
 // per delivery, one card per object).
 func (s *Server) handleMediaList(w http.ResponseWriter, r *http.Request, mailbox int64) *problem {
+	s.SN.ExpireOffers(r.Context(), s.now())
 	rows, err := s.DB.QueryContext(r.Context(),
 		`SELECT rf.urn, rf.state, COALESCE(rf.cause,''), COALESCE(rf.name,''), rf.size, rf.type,
-		        rf.available_until, rf.direction,
+		        rf.available_until, rf.direction, COALESCE(rf.preview_of,''),
 		        COALESCE((SELECT o.state FROM objects o WHERE o.urn = rf.urn), '')
 		 FROM refs rf WHERE rf.mailbox_id=? ORDER BY rf.urn, rf.updated_at`, mailbox)
 	if err != nil {
@@ -46,6 +47,7 @@ func (s *Server) handleMediaList(w http.ResponseWriter, r *http.Request, mailbox
 		Type       string         `json:"type"`
 		Held       bool           `json:"held"`
 		Pinned     bool           `json:"pinned"`
+		PreviewOf  string         `json:"preview_of,omitempty"` // MEP-002: fold hint
 		States     map[string]int `json:"states"`
 		Deliveries int            `json:"deliveries"`
 		Windows    []string       `json:"windows"`
@@ -53,9 +55,9 @@ func (s *Server) handleMediaList(w http.ResponseWriter, r *http.Request, mailbox
 	byURN := map[string]*card{}
 	var order []string
 	for rows.Next() {
-		var urn, state, cause, name, typ, until, direction, objState string
+		var urn, state, cause, name, typ, until, direction, previewOf, objState string
 		var size int64
-		if err := rows.Scan(&urn, &state, &cause, &name, &size, &typ, &until, &direction, &objState); err != nil {
+		if err := rows.Scan(&urn, &state, &cause, &name, &size, &typ, &until, &direction, &previewOf, &objState); err != nil {
 			return problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
 		}
 		c, ok := byURN[urn]
@@ -71,6 +73,9 @@ func (s *Server) handleMediaList(w http.ResponseWriter, r *http.Request, mailbox
 		c.Deliveries++
 		c.Held = objState == "live"
 		c.Pinned = c.Pinned || state == "pinned"
+		if previewOf != "" {
+			c.PreviewOf = previewOf
+		}
 		c.Windows = append(c.Windows, until)
 	}
 	if err := rows.Err(); err != nil {
