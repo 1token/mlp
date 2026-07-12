@@ -11,6 +11,12 @@ jobs:
       - name: regenerate all vectors
         working-directory: conformance/generators
         run: for g in tv-*.py; do python "$g"; done
+      - name: D-104 MUST audit reconciles with the spec
+        working-directory: .
+        run: |
+          python conformance/audit-musts.py
+          python conformance/audit-annotate.py
+          git diff --exit-code conformance/must-corpus.txt conformance/MUST-AUDIT.md
       - name: vectors must be byte-identical to committed
         run: git diff --exit-code conformance/vectors
   server-tests:

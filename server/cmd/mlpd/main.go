@@ -89,6 +89,19 @@ func run(domain, listen, dataDir, clientDir, initUser, password, origin string, 
 			n.pushOnce(context.Background())
 		}
 	}()
+	go func() {
+		// The D-139 sweep: ephemeral-class references release their
+		// bytes when nothing pins them (§10.5 invariants); hourly is
+		// plenty at prototype scale.
+		for {
+			time.Sleep(time.Hour)
+			if collected, prob := n.SN.CollectGarbage(context.Background(), n.BS, time.Now().UTC()); prob != nil {
+				log.Printf("mlpd: gc: %v", prob)
+			} else if len(collected) > 0 {
+				log.Printf("mlpd: gc collected %d ephemeral objects", len(collected))
+			}
+		}
+	}()
 	log.Printf("mlpd: %s listening on %s (data %s)", domain, listen, dataDir)
 	return http.ListenAndServe(listen, n.mux)
 }

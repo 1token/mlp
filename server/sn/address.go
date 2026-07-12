@@ -29,7 +29,7 @@ func ParseAddress(s string) (local, domain string, err error) {
 	if plus := strings.IndexByte(local, '+'); plus >= 0 {
 		base = local[:plus]
 		tag := local[plus+1:]
-		if tag == "" || !validRun(tag, "+.") {
+		if tag == "" || !validRun(tag, "_+.") {
 			return "", "", fmt.Errorf("mlp/sn: malformed subaddress tag (§4.1)")
 		}
 	}
@@ -37,7 +37,7 @@ func ParseAddress(s string) (local, domain string, err error) {
 		return "", "", fmt.Errorf("mlp/sn: empty local base (§4.1)")
 	}
 	for _, atom := range strings.Split(base, ".") {
-		if atom == "" || !validRun(atom, "") {
+		if atom == "" || !validRun(atom, "_") {
 			return "", "", fmt.Errorf("mlp/sn: malformed local base %q (§4.1)", base)
 		}
 	}
@@ -64,12 +64,15 @@ func MailboxKey(addr string) string {
 	return local + addr[at:]
 }
 
-// validRun reports whether s consists of [a-z0-9-_] plus any bytes in
+// validRun reports whether s consists of [a-z0-9-] plus any bytes in
 // extra. Uppercase is excluded: routing form is lowercase (§4.2).
+// Underscore is NOT in the base run: §4.1 local atoms admit it (via
+// extra), IDNA2008 domain labels do not (LDH) — the distinction the
+// D-104 audit's grammar test caught.
 func validRun(s, extra string) bool {
 	for i := 0; i < len(s); i++ {
 		c := s[i]
-		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' ||
+		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' ||
 			strings.IndexByte(extra, c) >= 0 {
 			continue
 		}
@@ -86,8 +89,9 @@ func validDomain(d string) error {
 		return fmt.Errorf("mlp/sn: domain %q violates §4.1 constraint 4", d)
 	}
 	for _, label := range strings.Split(d, ".") {
-		if label == "" || len(label) > 63 || !validRun(label, "") {
-			return fmt.Errorf("mlp/sn: domain %q has a malformed label (§4.1)", d)
+		if label == "" || len(label) > 63 || !validRun(label, "") ||
+			label[0] == '-' || label[len(label)-1] == '-' {
+			return fmt.Errorf("mlp/sn: domain %q has a malformed label (§4.1/IDNA2008 LDH)", d)
 		}
 	}
 	return nil

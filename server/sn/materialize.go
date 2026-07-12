@@ -85,12 +85,15 @@ func (s *SN) materialize(ctx context.Context, pe *ParsedEnvelope, targets []reci
 				return problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
 			}
 			// D-139: an auto-granted entry is already accepted by
-			// policy — the reference steps to expected at once, and
-			// arrival (OnVerified) completes it to available with
-			// no user action.
+			// policy — the reference steps to expected at once
+			// (arrival completes it to available with no user
+			// action) and carries the EPHEMERAL class: policy
+			// admitted it, so GC may take it first (§10.5's class
+			// latitude). A deliberate accept or pin outranks the
+			// class exactly as the state machine already says.
 			if granted[me.URN] {
 				if _, err := tx.ExecContext(ctx,
-					`UPDATE refs SET state='expected', updated_at=? WHERE mailbox_id=? AND urn=? AND medialet_ca=? AND state='offered'`,
+					`UPDATE refs SET state='expected', ephemeral=1, updated_at=? WHERE mailbox_id=? AND urn=? AND medialet_ca=? AND state='offered'`,
 					nowS, t.mailboxID, me.URN, pe.ContentAddress); err != nil {
 					return problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
 				}
