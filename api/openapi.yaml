@@ -1,0 +1,640 @@
+openapi: "3.0.3"
+info:
+  title: MLP Client API
+  version: "0.1-draft-01"
+  description: >
+    The mailbox-owner and guest surface of an MLP domain, as served
+    by the reference implementation (mlpd) under /api/v1. Wire
+    conventions per the Client API companion document and D-170: one
+    JSON dialect (snake_case, integers only, RFC 3339 UTC), errors
+    as application/problem+json, mutations require the X-MLP-Client
+    header (CSRF posture) and, on POST, accept a client-minted
+    Idempotency-Key (D-169). The FEDERATION surface (/dispatch,
+    /fulfill, /verdict, /ingest, /.well-known/medialet.json) is
+    signature-driven and specified normatively by the MLP Core
+    Specification, not here.
+  license:
+    name: Apache-2.0
+servers:
+  - url: /api/v1
+
+security:
+  - session: []
+
+tags:
+  - name: auth
+  - name: threads
+  - name: drafts
+  - name: uploads
+  - name: media
+  - name: deliveries
+  - name: guest
+    description: Sessionless, capability-token-gated (D-151–D-155).
+  - name: webauthn
+  - name: system
+
+paths:
+  /auth/password:
+    post:
+      tags: [auth]
+      summary: Password-fallback login (D-161); issues a session cookie.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [address, password]
+              properties:
+                address: { type: string, example: novak@target.example }
+                password: { type: string, format: password }
+      responses:
+        "200": { description: Session cookie set., content: { application/json: { schema: { $ref: "#/components/schemas/SessionCreated" } } } }
+        "401": { $ref: "#/components/responses/Problem" }
+
+  /sessions:
+    get:
+      tags: [auth]
+      summary: List this mailbox's sessions.
+      responses:
+        "200": { description: Sessions., content: { application/json: { schema: { type: object, properties: { sessions: { type: array, items: { $ref: "#/components/schemas/Session" } } } } } } }
+    delete:
+      tags: [auth]
+      summary: Revoke every session except the current one.
+      responses:
+        "200": { description: Revoked. }
+  /sessions/{hash}:
+    delete:
+      tags: [auth]
+      summary: Revoke one session.
+      parameters: [ { name: hash, in: path, required: true, schema: { type: string } } ]
+      responses:
+        "200": { description: Revoked. }
+        "404": { $ref: "#/components/responses/Problem" }
+
+  /webauthn/register/begin:
+    post:
+      tags: [webauthn]
+      summary: Begin passkey registration for the session's mailbox.
+      responses:
+        "200": { description: Creation options., content: { application/json: { schema: { $ref: "#/components/schemas/WebAuthnRegisterOptions" } } } }
+  /webauthn/register/finish:
+    post:
+      tags: [webauthn]
+      summary: Verify the attestation (fmt "none" only) and store the credential.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challenge, client_data_json, attestation_object]
+              properties:
+                challenge: { type: string }
+                client_data_json: { type: string, format: base64url }
+                attestation_object: { type: string, format: base64url }
+      responses:
+        "200": { description: Registered., content: { application/json: { schema: { type: object, properties: { credential_id: { type: string } } } } } }
+        "401": { $ref: "#/components/responses/Problem" }
+  /webauthn/login/begin:
+    post:
+      tags: [webauthn]
+      summary: Begin assertion login. Unknown addresses answer indistinguishably (empty allow-list).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [address], properties: { address: { type: string } } }
+      responses:
+        "200": { description: Request options., content: { application/json: { schema: { $ref: "#/components/schemas/WebAuthnLoginOptions" } } } }
+  /webauthn/login/finish:
+    post:
+      tags: [webauthn]
+      summary: Verify the assertion; issues a session cookie.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challenge, credential_id, client_data_json, authenticator_data, signature]
+              properties:
+                challenge: { type: string }
+                credential_id: { type: string }
+                client_data_json: { type: string, format: base64url }
+                authenticator_data: { type: string, format: base64url }
+                signature: { type: string, format: base64url }
+      responses:
+        "200": { description: Session cookie set., content: { application/json: { schema: { $ref: "#/components/schemas/SessionCreated" } } } }
+        "401": { $ref: "#/components/responses/Problem" }
+
+  /threads:
+    get:
+      tags: [threads]
+      summary: List threads for a lens.
+      parameters:
+        - { name: view, in: query, schema: { type: string, enum: [inbox, junk], default: inbox } }
+      responses:
+        "200": { description: Threads., content: { application/json: { schema: { type: object, properties: { threads: { type: array, items: { $ref: "#/components/schemas/Thread" } } } } } } }
+  /threads/{id}:
+    get:
+      tags: [threads]
+      summary: One thread with its messages (render forms, refs, manifest).
+      parameters: [ { $ref: "#/components/parameters/threadId" } ]
+      responses:
+        "200": { description: Thread detail., content: { application/json: { schema: { $ref: "#/components/schemas/ThreadDetail" } } } }
+        "404": { $ref: "#/components/responses/Problem" }
+  /threads/{id}/read:
+    post: { tags: [threads], summary: Mark read., parameters: [ { $ref: "#/components/parameters/threadId" } ], responses: { "200": { description: OK. } } }
+  /threads/{id}/done:
+    post: { tags: [threads], summary: Sweep done., parameters: [ { $ref: "#/components/parameters/threadId" } ], responses: { "200": { description: OK. } } }
+  /threads/{id}/flag:
+    post: { tags: [threads], summary: Toggle flag., parameters: [ { $ref: "#/components/parameters/threadId" } ], responses: { "200": { description: OK. } } }
+  /threads/{id}/release:
+    post:
+      tags: [threads]
+      summary: Release from junk — the sender gains the `allow` override, outranking any classifier (D-165).
+      parameters: [ { $ref: "#/components/parameters/threadId" } ]
+      responses: { "200": { description: Released. } }
+  /threads/{id}/block:
+    post:
+      tags: [threads]
+      summary: Block the sender; the thread stays in junk for the record (D-165).
+      parameters: [ { $ref: "#/components/parameters/threadId" } ]
+      responses: { "200": { description: Blocked. } }
+
+  /drafts:
+    get:
+      tags: [drafts]
+      summary: List drafts.
+      responses:
+        "200": { description: Drafts., content: { application/json: { schema: { type: object, properties: { drafts: { type: array, items: { $ref: "#/components/schemas/DraftSummary" } } } } } } }
+    post:
+      tags: [drafts]
+      summary: Create a draft.
+      requestBody: { $ref: "#/components/requestBodies/Draft" }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { type: object, properties: { id: { type: string } } } } } }
+  /drafts/{id}:
+    get:
+      tags: [drafts]
+      summary: Fetch a draft.
+      parameters: [ { $ref: "#/components/parameters/draftId" } ]
+      responses:
+        "200": { description: The draft document., content: { application/json: { schema: { $ref: "#/components/schemas/DraftContent" } } } }
+    patch:
+      tags: [drafts]
+      summary: Autosave (replace the draft document).
+      parameters: [ { $ref: "#/components/parameters/draftId" } ]
+      requestBody: { $ref: "#/components/requestBodies/Draft" }
+      responses: { "200": { description: Saved. } }
+    delete:
+      tags: [drafts]
+      summary: Discard a draft.
+      parameters: [ { $ref: "#/components/parameters/draftId" } ]
+      responses: { "200": { description: Discarded. } }
+  /drafts/{id}/send:
+    post:
+      tags: [drafts]
+      summary: >
+        Send: pre-flight possession of every Manifest urn (D-135),
+        author+hop signing, per-domain dispatch fan-out, guest link
+        minting (D-237/D-238). Arms the 10 s undo hold client-side.
+      parameters: [ { $ref: "#/components/parameters/draftId" } ]
+      responses:
+        "200": { description: Per-target and per-guest outcomes., content: { application/json: { schema: { $ref: "#/components/schemas/SendResult" } } } }
+        "409": { $ref: "#/components/responses/Problem" }
+  /undo:
+    post:
+      tags: [drafts]
+      summary: Undo the most recent undoable action (the send hold, D-138).
+      responses: { "200": { description: Undone. } }
+
+  /uploads:
+    post:
+      tags: [uploads]
+      summary: >
+        Declare an object by address (hash-first, D-135). If the
+        store already holds it, `have: true` short-circuits the
+        upload entirely.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [urn, size]
+              properties:
+                urn: { $ref: "#/components/schemas/Urn" }
+                size: { type: integer, format: int64, minimum: 1 }
+      responses:
+        "200": { description: Already held., content: { application/json: { schema: { type: object, properties: { have: { type: boolean, enum: [true] } } } } } }
+        "201": { description: Upload resource created., content: { application/json: { schema: { type: object, properties: { have: { type: boolean, enum: [false] }, upload: { type: string, description: "/uploads/{token} path" } } } } } }
+  /uploads/{token}:
+    head:
+      tags: [uploads]
+      summary: The durable checkpoint — resume from Upload-Offset.
+      parameters: [ { $ref: "#/components/parameters/uploadToken" } ]
+      responses:
+        "200":
+          description: Current offset.
+          headers: { Upload-Offset: { schema: { type: integer, format: int64 } } }
+    patch:
+      tags: [uploads]
+      summary: Append a chunk at the declared offset (tus profile, §8).
+      parameters:
+        - { $ref: "#/components/parameters/uploadToken" }
+        - { name: Upload-Offset, in: header, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content:
+          application/offset+octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        "204":
+          description: Chunk applied; verification runs at the final byte.
+          headers: { Upload-Offset: { schema: { type: integer, format: int64 } } }
+        "409": { $ref: "#/components/responses/Problem" }
+
+  /o/{urn}/accept:
+    post:
+      tags: [media]
+      summary: >
+        Accept an offered object. Local possession completes
+        instantly (offered→expected→available in one action —
+        claims, resends, dedup; D-241); otherwise the deferred
+        verdict upgrades at the origin and the transfer follows.
+      parameters: [ { $ref: "#/components/parameters/urn" } ]
+      responses:
+        "200": { description: Accepted., content: { application/json: { schema: { $ref: "#/components/schemas/AcceptResult" } } } }
+        "404": { $ref: "#/components/responses/Problem" }
+  /o/{urn}/pin:
+    post: { tags: [media], summary: "Pin: retained absolutely (§10.5 invariant 1).", parameters: [ { $ref: "#/components/parameters/urn" } ], responses: { "200": { description: Pinned. }, "409": { $ref: "#/components/responses/Problem" } } }
+  /o/{urn}/unpin:
+    post: { tags: [media], summary: Unpin., parameters: [ { $ref: "#/components/parameters/urn" } ], responses: { "200": { description: Unpinned. } } }
+  /o/{urn}:
+    get:
+      tags: [media]
+      summary: Serve held object bytes (owner; hardened headers).
+      parameters: [ { $ref: "#/components/parameters/urn" } ]
+      responses:
+        "200": { description: Bytes., content: { "*/*": { schema: { type: string, format: binary } } } }
+        "404": { $ref: "#/components/responses/Problem" }
+    delete:
+      tags: [media]
+      summary: Owner delete — allowed even for pinned objects (D-88); honest tombstones follow.
+      parameters: [ { $ref: "#/components/parameters/urn" } ]
+      responses: { "200": { description: Deleted. } }
+  /objects/have:
+    get:
+      tags: [media]
+      summary: Batch possession check for composer attach-by-reference.
+      parameters: [ { name: urns, in: query, required: true, schema: { type: string }, description: comma-separated } ]
+      responses:
+        "200": { description: Possession map., content: { application/json: { schema: { type: object, additionalProperties: { type: boolean } } } } }
+  /m/{ca}:
+    get:
+      tags: [media]
+      summary: The raw Signed Medialet, recipients only (D-28 fidelity source).
+      parameters: [ { name: ca, in: path, required: true, schema: { $ref: "#/components/schemas/Urn" } } ]
+      responses:
+        "200": { description: Canonical bytes., content: { application/json: { schema: { type: object } } } }
+        "404": { $ref: "#/components/responses/Problem" }
+  /media:
+    get:
+      tags: [media]
+      summary: The media library — cards grouped by urn, preview fold hints (MEP-002).
+      responses:
+        "200": { description: Cards., content: { application/json: { schema: { type: object, properties: { media: { type: array, items: { $ref: "#/components/schemas/MediaCard" } } } } } } }
+  /correspondents:
+    get:
+      tags: [media]
+      summary: The correspondents ledger with legible tier reasons (D-162).
+      responses:
+        "200": { description: Ledger., content: { application/json: { schema: { type: object, properties: { correspondents: { type: array, items: { $ref: "#/components/schemas/Correspondent" } } } } } } }
+  /correspondents/{addr}:
+    put:
+      tags: [media]
+      summary: Set or clear a tier override (allow | block | "").
+      parameters: [ { name: addr, in: path, required: true, schema: { type: string } } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { tier_override: { type: string, enum: [allow, block, ""] } } }
+      responses: { "200": { description: Set. } }
+
+  /deliveries:
+    get:
+      tags: [deliveries]
+      summary: The sender's job view, grouped by job tag (D-148).
+      responses:
+        "200": { description: Deliveries., content: { application/json: { schema: { type: object, properties: { deliveries: { type: array, items: { $ref: "#/components/schemas/Delivery" } } } } } } }
+  /deliveries/{id}:
+    get:
+      tags: [deliveries]
+      summary: One delivery.
+      parameters: [ { $ref: "#/components/parameters/deliveryId" } ]
+      responses:
+        "200": { description: Delivery., content: { application/json: { schema: { $ref: "#/components/schemas/Delivery" } } } }
+  /deliveries/{id}/timeline:
+    get:
+      tags: [deliveries]
+      summary: Protocol facts only — no read receipts exist (D-147/D-149).
+      parameters: [ { $ref: "#/components/parameters/deliveryId" } ]
+      responses:
+        "200": { description: Timeline., content: { application/json: { schema: { type: object, properties: { events: { type: array, items: { $ref: "#/components/schemas/TimelineEvent" } } } } } } }
+
+  /guest/{token}:
+    get:
+      tags: [guest]
+      summary: >
+        The delivery payload for a capability link. PIN-protected
+        links require X-MLP-Guest-PIN; five failures lock the link
+        (423) with the lock checked before PIN evaluation (D-155).
+        Reading is never recorded (D-147).
+      security: []
+      parameters: [ { $ref: "#/components/parameters/guestToken" }, { $ref: "#/components/parameters/guestPIN" } ]
+      responses:
+        "200": { description: Payload., content: { application/json: { schema: { $ref: "#/components/schemas/GuestPayload" } } } }
+        "401": { $ref: "#/components/responses/Problem" }
+        "410": { $ref: "#/components/responses/Problem" }
+        "423": { $ref: "#/components/responses/Problem" }
+  /guest/{token}/o/{urn}:
+    get:
+      tags: [guest]
+      summary: Download one manifest object (recorded — D-147).
+      security: []
+      parameters: [ { $ref: "#/components/parameters/guestToken" }, { $ref: "#/components/parameters/urn" }, { $ref: "#/components/parameters/guestPIN" } ]
+      responses:
+        "200": { description: Bytes (Content-Disposition attachment)., content: { "*/*": { schema: { type: string, format: binary } } } }
+        "404": { $ref: "#/components/responses/Problem" }
+  /guest/{token}/claim:
+    post:
+      tags: [guest]
+      summary: >
+        The claim ceremony (D-154/D-240): possession of link + PIN
+        mints a mailbox, re-dispatches the original Signed Medialet
+        through the real ingest, and issues a session. One claim per
+        link; the link survives.
+      security: []
+      parameters: [ { $ref: "#/components/parameters/guestToken" }, { $ref: "#/components/parameters/guestPIN" } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [local_part]
+              properties:
+                local_part: { type: string, pattern: "^[a-z0-9][a-z0-9._-]{0,63}$" }
+      responses:
+        "200": { description: Claimed; session cookie set., content: { application/json: { schema: { type: object, properties: { address: { type: string }, mailbox_id: { type: integer }, envelope_id: { type: string } } } } } }
+        "409": { $ref: "#/components/responses/Problem" }
+
+  /events:
+    get:
+      tags: [system]
+      summary: Server-sent events stream (thread and media change notifications).
+      responses:
+        "200": { description: SSE stream., content: { text/event-stream: { schema: { type: string } } } }
+  /quota:
+    get:
+      tags: [system]
+      summary: Per-store usage.
+      responses:
+        "200": { description: Usage., content: { application/json: { schema: { type: object, properties: { stores: { type: array, items: { type: object, properties: { store_id: { type: integer }, name: { type: string }, used_bytes: { type: integer, format: int64 } } } } } } } } }
+  /settings:
+    get:
+      tags: [system]
+      summary: Mailbox settings.
+      responses:
+        "200": { description: Settings map., content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+    patch:
+      tags: [system]
+      summary: Merge settings.
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+      responses: { "200": { description: Saved. } }
+
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: mlp_session
+      description: >
+        Issued by password login, passkey login, or a guest claim.
+        Every non-GET request additionally requires the X-MLP-Client
+        header (any value — the CSRF posture, D-170); mutating POSTs
+        accept Idempotency-Key (D-169).
+
+  parameters:
+    threadId: { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+    draftId: { name: id, in: path, required: true, schema: { type: string } }
+    deliveryId: { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+    uploadToken: { name: token, in: path, required: true, schema: { type: string } }
+    guestToken: { name: token, in: path, required: true, schema: { type: string }, description: The capability token (never stored server-side; only its hash). }
+    guestPIN: { name: X-MLP-Guest-PIN, in: header, required: false, schema: { type: string, pattern: "^[0-9]{6}$" } }
+    urn: { name: urn, in: path, required: true, schema: { $ref: "#/components/schemas/Urn" } }
+
+  requestBodies:
+    Draft:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/DraftContent" }
+
+  responses:
+    Problem:
+      description: An error, always application/problem+json.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+  schemas:
+    Urn:
+      type: string
+      pattern: "^urn:mlet:b[a-z2-7]+$"
+      description: BLAKE3-256 multihash, multibase base32-lower (D-25).
+      example: urn:mlet:bdyqbcgucl4thqvg5tqzv66l4q6myvy3j647jojvokzpw2c4ohcctu6y
+    Problem:
+      type: object
+      properties:
+        type: { type: string, example: "urn:mlp:err:malformed" }
+        title: { type: string, example: malformed }
+        status: { type: integer }
+        detail: { type: string }
+    SessionCreated:
+      type: object
+      properties:
+        mailbox_id: { type: integer, format: int64 }
+    Session:
+      type: object
+      properties:
+        hash: { type: string }
+        created: { type: string, format: date-time }
+        last_seen: { type: string, format: date-time }
+        user_agent: { type: string }
+        current: { type: boolean }
+    Thread:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        subject: { type: string }
+        snippet: { type: string, description: "From the §11.6 derived text (D-132)." }
+        who: { type: string }
+        last_activity: { type: string, format: date-time }
+        unread: { type: boolean }
+        done: { type: boolean }
+        flagged: { type: boolean }
+        junk: { type: boolean }
+    ThreadDetail:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              medialet_ca: { $ref: "#/components/schemas/Urn" }
+              author: { type: string }
+              created: { type: string, format: date-time }
+              body: { type: object, properties: { profile: { type: string, enum: [mlp-html/1] }, content: { type: string, description: "The render form; the client re-sanitizes (D-31)." }, degraded: { type: boolean } } }
+              refs: { type: array, items: { $ref: "#/components/schemas/Ref" } }
+    Ref:
+      type: object
+      properties:
+        urn: { $ref: "#/components/schemas/Urn" }
+        state: { type: string, enum: [offered, expected, available, pinned, unavailable, promised] }
+        cause: { type: string, enum: [expired-remote, expired-local, declined, failed, deleted] }
+        name: { type: string }
+        size: { type: integer, format: int64 }
+        type: { type: string }
+        available_until: { type: string, format: date-time, description: "The EFFECTIVE deadline (MEP-001)." }
+        preview_of: { $ref: "#/components/schemas/Urn" }
+    DraftContent:
+      type: object
+      required: [body_content, recipients]
+      properties:
+        subject: { type: string }
+        body_content: { type: string, description: mlp-html/1 source }
+        in_reply_to: { $ref: "#/components/schemas/Urn" }
+        recipients: { type: array, items: { type: string }, maxItems: 128 }
+        guests: { type: array, items: { type: string }, description: "Named explicitly; never in envelope_to (D-237)." }
+        guest_pin: { type: boolean, description: "Per-draft second-channel PINs (D-238)." }
+        job_tag: { type: string }
+        manifest:
+          type: array
+          items:
+            type: object
+            required: [urn, size, type, available_until]
+            properties:
+              urn: { $ref: "#/components/schemas/Urn" }
+              size: { type: integer, format: int64 }
+              type: { type: string }
+              name: { type: string }
+              available_until: { type: string, format: date-time }
+              preview_of: { $ref: "#/components/schemas/Urn" }
+    DraftSummary:
+      type: object
+      properties:
+        id: { type: string }
+        subject: { type: string }
+        updated: { type: string, format: date-time }
+    SendResult:
+      type: object
+      properties:
+        delivery_id: { type: integer, format: int64 }
+        medialet_ca: { $ref: "#/components/schemas/Urn" }
+        targets:
+          type: array
+          items:
+            type: object
+            properties:
+              domain: { type: string }
+              message: { type: string, example: accepted }
+        guests:
+          type: array
+          items:
+            type: object
+            properties:
+              recipient: { type: string }
+              path: { type: string, example: /g/3fk9… }
+              pin: { type: string, description: "Disclosed ONCE, to the sender (D-238)." }
+              expires_at: { type: string, format: date-time }
+    AcceptResult:
+      type: object
+      properties:
+        urn: { $ref: "#/components/schemas/Urn" }
+        state: { type: string, enum: [available, expected] }
+        instant: { type: boolean, description: "True when local possession completed the accept on the spot (D-241)." }
+    MediaCard:
+      type: object
+      properties:
+        urn: { $ref: "#/components/schemas/Urn" }
+        name: { type: string }
+        size: { type: integer, format: int64 }
+        type: { type: string }
+        held: { type: boolean }
+        pinned: { type: boolean }
+        preview_of: { $ref: "#/components/schemas/Urn" }
+        states: { type: object, additionalProperties: { type: integer } }
+        deliveries: { type: integer }
+        windows: { type: array, items: { type: string, format: date-time } }
+    Correspondent:
+      type: object
+      properties:
+        addr: { type: string }
+        tier_override: { type: string, enum: [allow, ask-first, block, ""] }
+        first_outbound_at: { type: string, format: date-time, description: "The legible tier reason (D-162)." }
+    Delivery:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        medialet_ca: { $ref: "#/components/schemas/Urn" }
+        job_tag: { type: string }
+        created: { type: string, format: date-time }
+    TimelineEvent:
+      type: object
+      properties:
+        at: { type: string, format: date-time }
+        kind: { type: string, example: guest.download }
+        data: { type: object, additionalProperties: true }
+    GuestPayload:
+      type: object
+      properties:
+        subject: { type: string }
+        author: { type: string }
+        created: { type: string, format: date-time }
+        body: { type: object, properties: { profile: { type: string }, content: { type: string }, degraded: { type: boolean } } }
+        derived_text: { type: string }
+        files:
+          type: array
+          items:
+            type: object
+            properties:
+              urn: { $ref: "#/components/schemas/Urn" }
+              name: { type: string }
+              size: { type: integer, format: int64 }
+              type: { type: string }
+              preview_of: { $ref: "#/components/schemas/Urn" }
+        domain: { type: string }
+        claimed_as: { type: string, description: "Present after a claim — the link survives (D-154)." }
+    WebAuthnRegisterOptions:
+      type: object
+      properties:
+        challenge: { type: string, format: base64url }
+        rp: { type: object, properties: { id: { type: string }, name: { type: string } } }
+        user: { type: object, properties: { id: { type: string, format: base64url }, name: { type: string }, displayName: { type: string } } }
+        pubKeyCredParams: { type: array, items: { type: object, properties: { type: { type: string }, alg: { type: integer, enum: [-8, -7] } } } }
+        attestation: { type: string, enum: [none] }
+    WebAuthnLoginOptions:
+      type: object
+      properties:
+        challenge: { type: string, format: base64url }
+        rpId: { type: string }
+        allowCredentials: { type: array, items: { type: object, properties: { type: { type: string }, id: { type: string } } } }

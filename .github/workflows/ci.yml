@@ -17,6 +17,12 @@ jobs:
           python conformance/audit-musts.py
           python conformance/audit-annotate.py
           git diff --exit-code conformance/must-corpus.txt conformance/MUST-AUDIT.md
+      - name: generated docs reconcile (ER) and OpenAPI validates
+        run: |
+          python docs/architecture/gen-er.py
+          git diff --exit-code docs/architecture/DATA-MODEL.md
+          pip install --quiet openapi-spec-validator
+          python -c "from openapi_spec_validator import validate; import yaml; validate(yaml.safe_load(open('api/openapi.yaml')))"
       - name: vectors must be byte-identical to committed
         run: git diff --exit-code conformance/vectors
   server-tests:
