@@ -50,6 +50,9 @@ type SN struct {
 	// the raw Body); true demotes accepted strangers to quarantine.
 	// nil = no classifier.
 	Classifier func(derivedText string) bool
+	// AutoGrant enables the D-139 Tier-2 small-media policy; nil is
+	// the conservative spec default (defer everything at Tier 2).
+	AutoGrant *AutoGrantPolicy
 	// GuestNotifier is the D-153 mail room: sends the zero-tracking
 	// notification carrying the link only (never the PIN — that is
 	// the sender's second channel). nil = the sender conveys the
@@ -188,7 +191,13 @@ func (s *SN) ProcessDispatch(ctx context.Context, raw []byte) ([]byte, *Problem)
 	if prob := s.persistDispatch(ctx, pe, payload, canon, reservations, now); prob != nil {
 		return nil, prob
 	}
-	if prob := s.materialize(ctx, pe, targets, now); prob != nil {
+	granted := map[string]bool{}
+	for _, m := range media {
+		if m.Verdict == "grant" {
+			granted[m.URN] = true
+		}
+	}
+	if prob := s.materialize(ctx, pe, targets, granted, now); prob != nil {
 		return nil, prob
 	}
 	return canon, nil
@@ -208,6 +217,25 @@ func (s *SN) currentVerdictSnapshot(ctx context.Context, origin, envelopeID stri
 }
 
 type tier int
+
+// AllowInsecureTransport permits plain-http reservation target_urls
+// (§7.5 requires https). Set ONLY by the demo binary alongside
+// discovery.NewDemoFetcher; production composition never touches it.
+var AllowInsecureTransport = false
+
+// AutoGrantPolicy is the D-139 recipient policy: Tier-2 entries up
+// to EntryMax auto-grant in Manifest order within the per-envelope
+// Budget. This is LOCAL POLICY under §7.7's latitude — the spec
+// default (nil) defers everything at Tier 2, and TV-002 freezes
+// exactly that default. The product ships D-139 on.
+type AutoGrantPolicy struct {
+	EntryMax int64
+	Budget   int64
+}
+
+// D139AutoGrant is the decided product policy: ≤4 MiB per entry,
+// ≤32 MiB per envelope.
+var D139AutoGrant = &AutoGrantPolicy{EntryMax: 4 << 20, Budget: 32 << 20}
 
 const (
 	tierCorrespondent tier = 1
@@ -297,6 +325,7 @@ func (s *SN) mediaOutcomes(ctx context.Context, pe *ParsedEnvelope, now time.Tim
 	}
 	var media []MediaOutcome
 	var minted []*Reservation
+	var autoGranted int64 // D-139: the per-envelope small-media budget
 	for _, me := range pe.Manifest {
 		switch {
 		case anyT1:
@@ -325,8 +354,27 @@ func (s *SN) mediaOutcomes(ctx context.Context, pe *ParsedEnvelope, now time.Tim
 			media = append(media, MediaOutcome{URN: me.URN, Verdict: "grant", Reservation: r})
 			minted = append(minted, r)
 		case anyAccepted:
-			// Tier 2 default (§7.7): defer pending recipient
-			// acceptance; possession, if any, is not disclosed.
+			// Tier 2 (§7.7 + D-139): small media auto-grants — at
+			// most autoGrantEntryMax per entry, autoGrantBudget
+			// cumulative, walked in Manifest order — so previews
+			// render alive on first contact; everything larger
+			// defers pending acceptance. Possession is never
+			// disclosed to strangers (§7.5 masking): a held object
+			// still answers "grant", not "have".
+			if s.AutoGrant != nil && me.Size <= s.AutoGrant.EntryMax && autoGranted+me.Size <= s.AutoGrant.Budget {
+				autoGranted += me.Size
+				token, suffix := s.reservationSecret()
+				r := &Reservation{
+					URN:       me.URN,
+					MaxSize:   me.Size,
+					TargetURL: s.IngestBase + suffix,
+					Token:     token,
+					Expires:   now.Add(ReservationTTL).Format(time.RFC3339),
+				}
+				media = append(media, MediaOutcome{URN: me.URN, Verdict: "grant", Reservation: r})
+				minted = append(minted, r)
+				continue
+			}
 			media = append(media, MediaOutcome{URN: me.URN, Verdict: "defer", Reason: "pending-acceptance"})
 		default:
 			// Quarantined-only (§7.7 Tier 3: "defer or deny").

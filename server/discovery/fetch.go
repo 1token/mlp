@@ -91,6 +91,8 @@ type Fetcher struct {
 	checkAddr func(netip.Addr) error
 	// requirePort443 is true in production (§5.4 rule 1).
 	requirePort443 bool
+	// allowInsecure permits plain http; NewDemoFetcher only.
+	allowInsecure bool
 }
 
 // NewFetcher returns a production Fetcher enforcing the full §5.4
@@ -160,7 +162,7 @@ func (f *Fetcher) FetchDomainDocument(ctx context.Context, domain string) ([]byt
 	if err != nil {
 		return nil, nil, fmt.Errorf("mlp/discovery: %w", err)
 	}
-	if err := urlHardened(u, f.requirePort443); err != nil {
+	if err := urlHardened(u, f.requirePort443); err != nil && !(f.allowInsecure && u.Scheme == "http") {
 		return nil, nil, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, totalTimeout)
@@ -222,3 +224,25 @@ var errNegativeCached = errors.New("mlp/discovery: domain in negative cache (§5
 // set. Exported for the D-72 pusher connection-safety reuse (§7.5,
 // §8.2): transfer clients apply the same address filter at dial time.
 func ForbiddenAddr(ip netip.Addr) bool { return addrForbidden(ip) }
+
+// NewDemoFetcher returns a Fetcher for LOCAL DEMONSTRATIONS ONLY: it
+// resolves the given domains to explicit base URLs (typically
+// http://127.0.0.1:<port>), permits loopback dialing, plain HTTP,
+// and non-443 ports — every one of which the production §5.4
+// profile forbids. Domains outside the map fail closed. Nothing in
+// production composition calls this; the demo binary does, loudly.
+func NewDemoFetcher(peers map[string]string) *Fetcher {
+	f := NewFetcher()
+	f.endpoint = func(domain string) string {
+		base, ok := peers[domain]
+		if !ok {
+			return "https://" + domain + "/.well-known/medialet.json"
+		}
+		return base + "/.well-known/medialet.json"
+	}
+	f.checkAddr = func(netip.Addr) error { return nil }
+	f.requirePort443 = false
+	f.allowInsecure = true
+	f.client = f.newClient(http.DefaultTransport)
+	return f
+}

@@ -186,6 +186,18 @@ func (s *SN) Send(ctx context.Context, mailboxID int64, addr string, d *DraftCon
 			return nil, problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
 		}
 	}
+	// First outbound contact makes a correspondent (D-162: the
+	// legible tier reason; §7.5/§7.7 key Tier 1 on exactly this).
+	for _, r := range d.Recipients {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO correspondents (mailbox_id, addr, first_outbound_at)
+			 VALUES (?,?,?)
+			 ON CONFLICT(mailbox_id, addr) DO UPDATE SET
+			   first_outbound_at = COALESCE(first_outbound_at, excluded.first_outbound_at)`,
+			mailboxID, r, nowS); err != nil {
+			return nil, problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
+		}
+	}
 	// The sender's own copy (envelope_in NULL), read, threaded per
 	// D-110 — replies from recipients will join this thread.
 	threadID, prob := s.threadForSent(ctx, tx, mailboxID, d.InReplyTo, ca, nowS)

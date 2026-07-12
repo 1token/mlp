@@ -12,6 +12,7 @@
 import { html } from '../lib/html.js';
 import { store } from '../store/store.js';
 import { api, ApiError } from '../store/api.js';
+import { urnMletOfBlob } from '../lib/mlet-urn.js';
 
 const HOLD_MS = 10_000;
 
@@ -20,7 +21,7 @@ export class MlpComposer extends HTMLElement {
     super();
     /** @type {string | null} */
     this.draftId = null;
-    /** @type {{ urn: string, size: number, name: string }[]} */
+    /** @type {{ urn: string, size: number, name: string, type?: string }[]} */
     this.attached = [];
     /** @type {ReturnType<typeof setTimeout> | null} */
     this.holdTimer = null;
@@ -38,6 +39,7 @@ export class MlpComposer extends HTMLElement {
         <p><label>To <input id="to" placeholder="a@x.example, b@y.example"></label></p>
         <p><label>Subject <input id="subject"></label></p>
         <p><textarea id="body" rows="8" placeholder="<p>…</p>"></textarea></p>
+        <p><label>Attach files <input id="attach-file" type="file" multiple></label></p>
         <p><label>Attach by reference (urn:mlet:…) <input id="attach-urn"></label>
            <input id="attach-size" type="number" placeholder="size" min="1">
            <button id="attach">Attach</button></p>
@@ -45,6 +47,11 @@ export class MlpComposer extends HTMLElement {
         <p><button id="send">Send</button> <span id="status" role="status"></span></p>
       </section>`;
     this.querySelector('#attach')?.addEventListener('click', () => this.attach());
+    this.querySelector('#attach-file')?.addEventListener('change', async (e) => {
+      const input = /** @type {HTMLInputElement} */ (e.target);
+      for (const file of input.files ?? []) await this.attachFile(file);
+      input.value = '';
+    });
     this.querySelector('#send')?.addEventListener('click', () => this.armSend());
     for (const id of ['to', 'subject', 'body']) {
       this.querySelector('#' + id)?.addEventListener('change', () => this.autosave());
@@ -62,7 +69,7 @@ export class MlpComposer extends HTMLElement {
       body_content: this.fieldValue('body'),
       recipients: this.fieldValue('to').split(',').map((s) => s.trim()).filter(Boolean),
       manifest: this.attached.map((a) => ({
-        urn: a.urn, size: a.size, type: 'application/octet-stream', name: a.name,
+        urn: a.urn, size: a.size, type: a.type || 'application/octet-stream', name: a.name,
         available_until: new Date(Date.now() + 7 * 86400_000).toISOString().replace(/\.\d{3}Z$/, 'Z'),
       })),
     };
@@ -97,10 +104,49 @@ export class MlpComposer extends HTMLElement {
         if (status) status.textContent = 'attached by reference — already in your store';
         this.autosave();
       } else if (status) {
-        status.textContent = 'not in your store yet — file upload arrives with the media surface';
+        status.textContent = 'not in your store yet — pick the file itself to upload it';
       }
     } catch (e) {
       if (status) status.textContent = e instanceof ApiError ? e.message : 'attach failed';
+    }
+  }
+
+  /**
+   * The D-135 door, byte half: hash FIRST (the address is the
+   * question), have-check, then stream chunks from the server's
+   * confirmed offset — a reload resumes, never re-sends (D-244).
+   * @param {File} file
+   */
+  async attachFile(file) {
+    const status = this.querySelector('#status');
+    const say = (/** @type {string} */ t) => { if (status) status.textContent = t; };
+    try {
+      say('hashing ' + file.name + '…');
+      const urn = await urnMletOfBlob(file, (done, total) => {
+        say(`hashing ${file.name}: ${Math.round((100 * done) / total)}%`);
+      });
+      const declared = await api.uploadDeclare(urn, file.size);
+      if (!declared.have) {
+        let offset = await api.uploadHead(declared.upload);
+        const step = 4 * 1024 * 1024;
+        while (offset < file.size) {
+          const chunk = new Uint8Array(
+            await file.slice(offset, offset + step).arrayBuffer());
+          say(`uploading ${file.name}: ${Math.round((100 * offset) / file.size)}%`);
+          offset = await api.uploadPatch(declared.upload, offset, chunk);
+        }
+      }
+      this.attached.push({
+        urn, size: file.size, name: file.name,
+        type: file.type || 'application/octet-stream',
+      });
+      this.renderAttachments();
+      say(declared.have
+        ? 'attached — already in your store, nothing uploaded'
+        : 'uploaded, verified by address, attached');
+      this.autosave();
+    } catch (e) {
+      say(e instanceof ApiError ? e.message : 'upload failed — pick the file again to resume');
     }
   }
 

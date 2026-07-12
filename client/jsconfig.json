@@ -18,5 +18,8 @@
     "lib/**/*.js",
     "app/**/*.js",
     "store/**/*.js"
+  ],
+  "exclude": [
+    "lib/vendor"
   ]
 }

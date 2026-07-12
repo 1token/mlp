@@ -36,6 +36,8 @@ jobs:
         run: node client/test/run-tv005.js
       - name: html`` escaping discipline
         run: node client/test/run-html.js
+      - name: client urn:mlet construction (TV-001 anchor)
+        run: node client/test/run-urn.js
       - name: JSDoc types (tsc --noEmit, shipping client code)
         run: |
           npm install -g typescript@5.5

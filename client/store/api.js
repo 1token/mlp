@@ -70,6 +70,40 @@ export const api = {
   draftSend: (id) => call('POST', `/drafts/${id}/send`),
   /** @param {string} urn @param {number} size */
   uploadDeclare: (urn, size) => call('POST', '/uploads', { urn, size }),
+
+  /**
+   * The upload door's byte half (D-135): HEAD for the durable
+   * checkpoint, PATCH raw chunks from it — the tus resume shape.
+   * @param {string} uploadPath the server-issued /uploads/{token} path
+   */
+  uploadHead: async (uploadPath) => {
+    const resp = await fetch('/api/v1' + uploadPath.replace(/^\/api\/v1/, ''), {
+      method: 'HEAD', credentials: 'same-origin',
+    });
+    if (!resp.ok) throw new ApiError(resp.status, 'upload', 'offset check failed');
+    return Number(resp.headers.get('Upload-Offset') ?? 0);
+  },
+
+  /**
+   * @param {string} uploadPath
+   * @param {number} offset
+   * @param {Uint8Array} chunk
+   */
+  uploadPatch: async (uploadPath, offset, chunk) => {
+    const resp = await fetch('/api/v1' + uploadPath.replace(/^\/api\/v1/, ''), {
+      method: 'PATCH', credentials: 'same-origin',
+      headers: {
+        'X-MLP-Client': 'mlp-web/0.1',
+        'Upload-Offset': String(offset),
+        'Content-Type': 'application/offset+octet-stream',
+      },
+      body: chunk,
+    });
+    if (resp.status !== 204) {
+      throw new ApiError(resp.status, 'upload', 'chunk refused at offset ' + offset);
+    }
+    return Number(resp.headers.get('Upload-Offset') ?? offset + chunk.length);
+  },
   deliveries: () => call('GET', '/deliveries'),
   /** @param {number} id */
   delivery: (id) => call('GET', `/deliveries/${id}`),

@@ -2,7 +2,7 @@
 
 > Purpose: resume implementation in a fresh working session with zero
 > context loss. Read this first; everything else is referenced from it.
-> Updated at the S4.12 → S4.13 boundary (2026-07-12).
+> Updated at the S4.13 → S4.14 boundary (2026-07-12).
 
 ## 1. Project in one paragraph
 
@@ -53,6 +53,7 @@ sequential D-number; changes to frozen artifacts travel only as MEPs.
 | S4.9 | Ingest materialization (`sn/materialize.go`: messages/threads per D-110, offered refs per §10.3, rollups); `clientapi/threads.go` (inbox+junk views, full thread, triage trio with D-129 undo, `/undo`); accept authorization closed + refs offered→expected; client shell/store/inbox/thread over the S4.7 API and SSE | TV-001 ingest materializes thread+message+refs; replies join parent threads, orphans root their own, re-deliveries dedup; quarantine lands in junk; undo restores exactly and expires at 30 s; non-recipient accept 404s; html`` escaping suite + TV-005 gate + tsc all green |
 | S4.10 | `sn/compose.go` (D-138 pre-flight, author/1 via `keyWithRole`, per-domain fan-out, dispatch + synchronous verdict recording, deliveries/refs-promised/sender-copy/timeline materialization); `clientapi/drafts.go` (drafts CRUD, hash-first `/uploads` declare + intra-domain PATCH over the shared `bs` core, `/drafts/{id}/send`); `app/mlp-composer.js` (autosave, attach-by-reference, the 10 s undo hold) | **composing Petra's draft reproduces the TV-001 Signed Medialet AND Signed Envelope byte-identically**, dispatches to a live target over HTTP, and records **TV-002 verdict 1 byte-identically** on return; the upload door resumes at the checkpoint and refuses corrupt digests; send gates on possession (409); two-domain fan-out = one delivery, two envelopes, both recipients materialized |
 | S4.11 | `render/`: the Go §11 pipeline over x/net/html (spec-compliant HTML5 parsing) — sanitizer, §11.6 derived text, D-132 snippet; migration 0003 (`render_degraded`); derivation at ingest + send, rollup snippet, render-form thread payloads, the D-21 classifier hook; media library (cards, pin/unpin, owner delete, hardened object serving, raw-medialet endpoint), the `OnVerified` seam flipping expected→available; junk release/block with the correspondents ledger; client deliveries lens, media cards, nav tabs, junk actions | **the Go sanitizer passes all 14 TV-005 cases first run** — the third implementation through the corpus; the classifier demotes on derived text and a released sender outranks it; the media lifecycle walks §10.3 end-to-end offered→…→unavailable(deleted) |
+| S4.13 | The two-domain demo (Stage 3 Closing §5) + the composer's file door: `cmd/mlpd` (one binary per domain — SN + BS + Client API + static client + guest page + push loop; demo mode via `-peer` through `discovery.NewDemoFetcher`, loudly logged); `TestTwoDomainDemo` walks every §5 bullet over real TCP sockets; D-139 auto-grant implemented as the `sn.AutoGrant` recipient-policy knob (spec default stays defer-all — TV-002 reproduces); Send now writes the correspondents ledger (`first_outbound_at`), unlocking §7.5 `have` disclosure; vendored pure-JS blake3 (`@noble/hashes`, no wasm, CSP intact) + `lib/mlet-urn.js` gated on the TV-001 media address (run-urn.js in CI); the composer's hash-first file door with tus resume; `demo/run.sh` + `demo/DEMO.md` (the on-camera script) | **all seven definition-of-done bullets pass programmatically**: strangers' preview auto-grants and renders alive while the master defers; the push killed after one 2 MiB chunk sits at `pushing`/2097152 and resumes to a byte-verified object; the correspondent's resend answers `have` and accepts instantly; the reply threads and sweeps; the guest claims and instantly has; three genuine gaps surfaced and fixed at the root (auto-grant unimplemented, correspondents never written, StripPrefix breaking @target-uri) |
 | S4.12 | Guest + claim (S3.6) and passkeys (S3.8/D-233): migration 0005 (pin_failures + WebAuthn tables over the 0001-provisioned guest_links/guest_downloads); guest links minted at Send for explicitly named guests (hash-stored tokens, per-draft 6-digit PINs for the sender's second channel, the D-153 notifier hook carrying the link only, 30-day expiry); sessionless guest endpoints with the D-155 five-failure lock; payload = the render form (one viewer, two hosts — views never recorded, downloads recorded per D-147); the claim (D-154): mailbox minted, the original SM re-dispatched through the REAL local ingest (self-domain verificationKey path via own_keys), session issued, link surviving, one claim per link; instant-have as the possession short-circuit heading handleAccept (offered→expected→available in one action — claims, same-domain sends, D-26 dedup alike); `webauthn/` dependency-free (strict fixed-shape CBOR, fmt "none", ES256 + Ed25519, single-use 5-min challenges, sign-count regressions logged); register/login endpoints; client guest.html + mlp-guest.js (second viewer host, PIN prompt, blob downloads, claim + navigator.credentials) | **the guest journey passes end to end** — PIN gate, lock, un-tracked views, tracked downloads, claim → thread in the new inbox → `{state:"available", instant:true}` with no bytes moving, the link surviving its claim, expiry at day 31; the passkey ceremonies pass with synthetic authenticators (challenge reuse and tampered assertions refuse); found and fixed the drafts dialect break (untagged ManifestEntry marshaled CamelCase against D-170 — now snake_case at the root) |
 | MEP-001 + MEP-002 | Both accepted (editor decision 2026-07-12). Spec → **draft-02** (rename + changelog): §3.4.1 `until`, §10.3 effective offer deadline, §9.5 declarant binding (MEP-001); §3.2.2 `preview_of` (MEP-002). Migration 0004 (`refs.preview_of`). TV-006 (custody `until` past the Manifest window) + TV-007 (preview_of validation outcomes) with committed generators. Go: strict `until` validation + parsed `Sources`, `effectiveDeadline` into `refs.available_until`, `ExpireOffers` lazy sweep, `Forward(…until)` custody param, `ownDeclaredUntil` §9.5 own-record binding, two-pass order-independent preview_of strip (ingest + compose parity), media fold hint; client media card folding | **TV-006 custody envelope byte-identical** (1728 canonical bytes); the effective deadline is the declared `until`, not the passed Manifest date; the source honors exactly its own hop-signed window (will-push inside, resend past); TV-007's four outcomes reproduce; frozen TV-001–005 untouched |
 | S4.5 | `bs/`: §6.6 RFC 9421 profile, the §8.2–8.4 upload resource with the D-77 transactional pipeline, D-27 BLAKE3 checkpoints, §8.5 failure taxonomy, §8.7 pusher loop under D-72 | all three TV-003 signature bases reproduce **byte-identically** and vector signatures verify; the transcript replays header-for-header (204/20, HEAD 200 with the exact `Upload-Expires`, 204/36 `verified`); digest-mismatch rolls back, hash-mismatch resets to 0 and recovers, restart re-derives the checkpoint; the pusher survives a lost 204 with PATCH offsets exactly [0, 20] |
@@ -349,7 +350,37 @@ indistinguishable (empty allow-list), sign-count regression logged
 not fatal · D-243 one drafts dialect (D-170): ManifestEntry carries
 snake_case JSON tags — the latent CamelCase marshal was a bug fixed
 at the root, not papered at call sites; blake3-wasm stays deferred
-to S4.13 (D-233 restated).
+to S4.13 (D-233 restated). · D-244 in-browser hashing is the
+vendored pure-JS `@noble/hashes` blake3 (seven ESM files, two
+mechanical patches documented in the vendor README) rather than
+wasm: the client CSP keeps `script-src 'self'` with no
+`wasm-unsafe-eval` concession; wasm remains a post-1.0 performance
+option; the client's address construction is CI-gated on the TV-001
+media address (run-urn.js) · D-245 D-139 auto-grant is a RECIPIENT
+POLICY knob (`sn.AutoGrant`; product ships `sn.D139AutoGrant` on):
+the spec default stays defer-all at Tier 2 — exactly what TV-002
+froze, and the blanket first implementation broke that vector, which
+is the knob's justification; auto-granted refs step
+offered→expected at materialization and complete to available on
+arrival with no user action; possession is never disclosed to
+strangers (grant, not have — §7.5 masking); the ephemeral GC-first
+store class waits for S4.14 accounting · D-246 Send records every
+recipient in the correspondents ledger (`first_outbound_at`,
+COALESCE-keep) — the demo surfaced that tiers were read but never
+written; §7.5 have-disclosure to correspondents is now reachable ·
+D-247 mlpd composition: demo relaxations (`NewDemoFetcher`,
+`sn.AllowInsecureTransport`, plain-HTTP pusher) exist behind `-peer`
+only and log DEMO MODE; the BS mounts WITHOUT StripPrefix because
+`r.URL.RequestURI()` reconstructs from the path StripPrefix mutates,
+silently breaking the RFC 9421 @target-uri; PostVerdict speaks
+`application/mlp-verdict+json` and surfaces non-2xx as errors ·
+D-248 the demo's crash is simulated at the source read — the row
+stays `pushing` with the receiver's checkpoint intact, which is what
+kill -9 actually leaves — not via transport errors, which walk the
+retry ladder to `failed`; the resend bullet runs AFTER the reply
+because §7.5 keys `have` on correspondent tier; store routing and
+topic bundles/sweep are documented in DEMO.md as parked (S3.7/S3.11,
+D-233) rather than silently skipped.
 
 ## 4. Environment recipe (sandbox)
 
@@ -373,7 +404,7 @@ shipping driver (one import swap) — D-191.
 Domain Document fixture as the parsing anchor.
 **S4.4–S4.11 — done** (see table); every §11 duty is now
 implemented on both sides of the wire and the D-223 deferral is
-repaid. **S4.13 (next)**: the two-domain demo (Stage 3 Closing §5 definition of done) with blake3-wasm vendored for the composer's file door, then S4.14 hardening + the NLnet application package. Formerly: guest + claim (S3.6, D-151–D-155) — the
+repaid. **S4.14 (next)**: conformance hardening toward the every-MUST-a-test bar (D-104), the operator guide (D-180), store accounting incl. the D-139 GC-first class, and the NLnet application package finalized with D1–D5 real (D-42). Formerly: guest + claim (S3.6, D-151–D-155) — the
 guest delivery page (the second `<mlp-body-viewer>` consumer),
 capability links, the claim ceremony into a mailbox; WebAuthn joins
 here per D-233 (the auth surfaces travel together); blake3-wasm
@@ -389,7 +420,7 @@ conformance hardening + operator guide + NLnet.
 
 Per session: design/implementation presented with lettered judgment
 calls → Igor confirms explicitly → decisions frozen with sequential
-D-numbers (next free: **D-244**) → artifacts delivered as local
+D-numbers (next free: **D-249**) → artifacts delivered as local
 commits emitted as a `git format-patch` series against `origin/main`
 for Igor's review, `git am`, and push (D-196) → next-session pointer. Honesty rules: caught problems are
 surfaced, never patched silently; spec gaps go to the MEP queue;

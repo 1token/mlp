@@ -326,7 +326,8 @@ func parseReservation(v any, urn string) (*Reservation, *Problem) {
 	if r.TargetURL, ok = o["target_url"].(string); !ok {
 		return nil, malformed("reservation lacks target_url (§7.5)")
 	}
-	if u, err := url.Parse(r.TargetURL); err != nil || u.Scheme != "https" || u.Host == "" {
+	if u, err := url.Parse(r.TargetURL); err != nil || u.Host == "" ||
+		(u.Scheme != "https" && !(AllowInsecureTransport && u.Scheme == "http")) {
 		return nil, malformed("reservation target_url is not https (§7.5)")
 	}
 	if r.Token, ok = o["token"].(string); !ok || len(r.Token) < 1 || len(r.Token) > 512 {

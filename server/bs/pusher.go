@@ -333,3 +333,9 @@ func cutPrefix(s, prefix string) (string, bool) {
 	}
 	return s, false
 }
+
+// PusherSigningKeyForTest exposes the bs-role own-key lookup for the
+// two-domain demo probes. Test support only.
+func PusherSigningKeyForTest(db *sql.DB) (string, ed25519.PrivateKey, error) {
+	return (&Pusher{DB: db}).signingKey(context.Background())
+}

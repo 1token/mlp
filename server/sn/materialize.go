@@ -32,7 +32,7 @@ import (
 // (mailbox, medialet) — re-deliveries of the same Medialet dedup on
 // the UNIQUE constraint — plus offered refs per Manifest entry and
 // the thread rollup.
-func (s *SN) materialize(ctx context.Context, pe *ParsedEnvelope, targets []recipientTarget, now time.Time) *Problem {
+func (s *SN) materialize(ctx context.Context, pe *ParsedEnvelope, targets []recipientTarget, granted map[string]bool, now time.Time) *Problem {
 	if len(targets) == 0 {
 		return nil
 	}
@@ -83,6 +83,17 @@ func (s *SN) materialize(ctx context.Context, pe *ParsedEnvelope, targets []reci
 				nullable(me.Name), me.Size, me.Type,
 				effectiveDeadline(me, pe.Sources), nullable(me.PreviewOf), nowS); err != nil {
 				return problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
+			}
+			// D-139: an auto-granted entry is already accepted by
+			// policy — the reference steps to expected at once, and
+			// arrival (OnVerified) completes it to available with
+			// no user action.
+			if granted[me.URN] {
+				if _, err := tx.ExecContext(ctx,
+					`UPDATE refs SET state='expected', updated_at=? WHERE mailbox_id=? AND urn=? AND medialet_ca=? AND state='offered'`,
+					nowS, t.mailboxID, me.URN, pe.ContentAddress); err != nil {
+					return problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
+				}
 			}
 		}
 		if prob := updateRollup(ctx, tx, threadID, pe, nowS); prob != nil {
