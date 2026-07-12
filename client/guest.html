@@ -1,0 +1,29 @@
+<!doctype html>
+<!-- The guest delivery page (S3.6, D-151): the second host of the
+     one Body viewer. Same CSP posture as the app shell — a guest is
+     exactly the visitor the §11 pipeline exists to protect. Served
+     at /g/{token}; the token never leaves the URL path and the page
+     sets no cookies until a claim succeeds. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'none';
+    script-src 'self';
+    connect-src 'self';
+    img-src 'self';
+    media-src 'self';
+    style-src 'self' 'unsafe-inline';
+    base-uri 'none';
+    form-action 'none';
+    frame-ancestors 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>Delivery — Medialet</title>
+  <link rel="stylesheet" href="/styles/app.css">
+</head>
+<body>
+  <mlp-guest-page></mlp-guest-page>
+  <script type="module" src="/app/mlp-guest.js"></script>
+</body>
+</html>

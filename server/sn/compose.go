@@ -36,6 +36,8 @@ type DraftContent struct {
 	Recipients  []string        `json:"recipients"`
 	Manifest    []ManifestEntry `json:"manifest,omitempty"`
 	JobTag      string          `json:"job_tag,omitempty"`
+	Guests      []string        `json:"guests,omitempty"`    // D-151: named, never in envelope_to
+	GuestPIN    bool            `json:"guest_pin,omitempty"` // D-152: per-draft second-channel PINs
 }
 
 // DisplayedTo is the visible recipient list entry (D-03 honesty:
@@ -51,6 +53,7 @@ type SendResult struct {
 	DeliveryID int64           `json:"delivery_id"`
 	MedialetCA string          `json:"medialet_ca"`
 	Targets    []TargetOutcome `json:"targets"`
+	Guests     []GuestOutcome  `json:"guests,omitempty"` // D-151–D-153
 }
 
 type TargetOutcome struct {
@@ -67,8 +70,8 @@ func (s *SN) Send(ctx context.Context, mailboxID int64, addr string, d *DraftCon
 	now := s.now()
 
 	// --- Pre-flight (D-138), silent and total -----------------------
-	if len(d.Recipients) == 0 || len(d.Recipients) > 128 {
-		return nil, problemf(http.StatusBadRequest, "malformed", "1–128 recipients (§3.4.1)")
+	if len(d.Recipients)+len(d.Guests) == 0 || len(d.Recipients) > 128 {
+		return nil, problemf(http.StatusBadRequest, "malformed", "1–128 recipients (§3.4.1); a guests-only send is permitted")
 	}
 	byDomain := map[string][]string{}
 	var domainOrder []string
@@ -267,6 +270,13 @@ func (s *SN) Send(ctx context.Context, mailboxID int64, addr string, d *DraftCon
 			}
 		}
 		result.Targets = append(result.Targets, outcome)
+	}
+	if len(d.Guests) > 0 {
+		guests, prob := s.createGuestLinks(ctx, deliveryID, d.Guests, d.GuestPIN, s.now())
+		if prob != nil {
+			return nil, prob
+		}
+		result.Guests = guests
 	}
 	return result, nil
 }

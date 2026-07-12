@@ -28,6 +28,30 @@ func (s *Server) handleAccept(w http.ResponseWriter, r *http.Request, mailbox in
 	if _, err := core.ParseURNMlet(urn); err != nil {
 		return problemf(http.StatusBadRequest, "malformed", "%v", err)
 	}
+	// Instant-have (D-154): when the object is already live in this
+	// domain's store — a claimed guest delivery, any same-domain
+	// send, or a D-26 dedup hit — the accept completes on the spot:
+	// offered→expected→available with no transfer, because there is
+	// nothing to transfer. The mailbox's own refs row IS the
+	// authorization (materialized only from its deliveries), so no
+	// verdict lookup is needed; §10.3 sees two legal single steps.
+	var live int
+	if err := s.DB.QueryRowContext(r.Context(),
+		`SELECT COUNT(*) FROM objects WHERE urn=? AND state='live'`, urn).Scan(&live); err == nil && live > 0 {
+		nowS := s.now().Format(time.RFC3339)
+		res, err := s.DB.ExecContext(r.Context(),
+			`UPDATE refs SET state='expected', updated_at=? WHERE mailbox_id=? AND urn=? AND state='offered'`,
+			nowS, mailbox, urn)
+		if n, _ := res.RowsAffected(); err == nil && n > 0 {
+			if _, err := s.DB.ExecContext(r.Context(),
+				`UPDATE refs SET state='available', updated_at=? WHERE mailbox_id=? AND urn=? AND state='expected'`,
+				nowS, mailbox, urn); err == nil {
+				s.Hub.Emit(r.Context(), mailbox, "media.changed", map[string]any{"urn": urn})
+				writeJSON(w, http.StatusOK, map[string]any{"urn": urn, "state": "available", "instant": true})
+				return nil
+			}
+		}
+	}
 	// The most recent outbound snapshot holding this URN at defer.
 	var origin, envelopeID string
 	err := s.DB.QueryRowContext(r.Context(),

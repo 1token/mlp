@@ -345,6 +345,32 @@ func parseReservation(v any, urn string) (*Reservation, *Problem) {
 // are verification failures (401); resolution failures are
 // discovery-failed (502).
 func (s *SN) verificationKey(ctx context.Context, domain, kid, role string, at time.Time) (ed25519.PublicKey, *Problem) {
+	// Self-domain: a domain knows its own keys — verification
+	// consults own_keys directly (the §6.3 resolution machinery
+	// exists for REMOTE attribution). This is what lets Redispatch
+	// (D-154) ride the real ingest path.
+	if domain == s.Domain {
+		var seed []byte
+		var roles string
+		var nb, na sql.NullString
+		if err := s.DB.QueryRowContext(ctx,
+			`SELECT seed, roles, not_before, not_after FROM own_keys WHERE kid=?`, kid).
+			Scan(&seed, &roles, &nb, &na); err != nil {
+			return nil, problemf(http.StatusUnauthorized, "signature-invalid",
+				"kid %s is not one of this domain's own keys", kid)
+		}
+		var rr []string
+		if json.Unmarshal([]byte(roles), &rr) != nil || !contains(rr, role) {
+			return nil, problemf(http.StatusUnauthorized, "signature-invalid",
+				"own key %s lacks role %q (§6.3)", kid, role)
+		}
+		e := discovery.KeyEntry{NotBefore: nb.String, NotAfter: na.String}
+		if !e.ValidAt(at) || len(seed) != ed25519.SeedSize {
+			return nil, problemf(http.StatusUnauthorized, "signature-invalid",
+				"own key %s outside its validity window (§6.3)", kid)
+		}
+		return ed25519.NewKeyFromSeed(seed).Public().(ed25519.PublicKey), nil
+	}
 	entry, err := s.Resolver.ResolveKID(ctx, domain, kid)
 	if err != nil {
 		if errors.Is(err, discovery.ErrUnknownKID) {

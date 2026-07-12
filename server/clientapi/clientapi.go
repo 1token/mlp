@@ -30,11 +30,15 @@ import (
 // Server serves /api/v1 for one domain's mailboxes, wrapping the SN
 // (and through it the store and resolver).
 type Server struct {
-	DB  *sql.DB
-	SN  *sn.SN
-	BS  *bs.BS // the intra-domain upload door (D-135, one code path)
-	Hub *Hub
-	Now func() time.Time
+	// WebAuthnOrigin overrides the browser origin accepted in
+	// clientDataJSON (default https://<domain>); tests and
+	// plain-HTTP prototypes set it.
+	WebAuthnOrigin string
+	DB             *sql.DB
+	SN             *sn.SN
+	BS             *bs.BS // the intra-domain upload door (D-135, one code path)
+	Hub            *Hub
+	Now            func() time.Time
 
 	// PostVerdict delivers an upgrade snapshot to the origin's
 	// /verdict endpoint (§7.6). The default discovers the sn URL
@@ -192,5 +196,7 @@ func (s *Server) Handler() http.Handler {
 	s.registerThreadRoutes(mux)
 	s.registerComposeRoutes(mux)
 	s.registerMediaRoutes(mux)
+	s.registerGuestRoutes(mux)
+	s.registerWebAuthnRoutes(mux)
 	return mux
 }

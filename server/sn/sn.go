@@ -50,6 +50,11 @@ type SN struct {
 	// the raw Body); true demotes accepted strangers to quarantine.
 	// nil = no classifier.
 	Classifier func(derivedText string) bool
+	// GuestNotifier is the D-153 mail room: sends the zero-tracking
+	// notification carrying the link only (never the PIN — that is
+	// the sender's second channel). nil = the sender conveys the
+	// link personally.
+	GuestNotifier func(ctx context.Context, recipient, path string) error
 	// DispatchEndpoint overrides §5 discovery of a target's /dispatch.
 	DispatchEndpoint func(ctx context.Context, domain string) (string, error)
 	// NewReservationSecret returns a capability token (1–512 chars)

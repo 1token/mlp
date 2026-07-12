@@ -36,12 +36,12 @@ func malformed(format string, a ...any) *Problem {
 
 // ManifestEntry is a validated §3.2.2 entry.
 type ManifestEntry struct {
-	URN            string
-	Size           int64
-	Type           string
-	Name           string
-	AvailableUntil string
-	PreviewOf      string // MEP-002; "" when absent or ignored-as-violating
+	URN            string `json:"urn"`
+	Size           int64  `json:"size"`
+	Type           string `json:"type"`
+	Name           string `json:"name,omitempty"`
+	AvailableUntil string `json:"available_until"`
+	PreviewOf      string `json:"preview_of,omitempty"` // MEP-002; "" when absent or ignored-as-violating
 }
 
 // SourceEntry is one parsed fulfillment_sources entry (MEP-001).
