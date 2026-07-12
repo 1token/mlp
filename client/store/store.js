@@ -16,6 +16,7 @@
  * @typedef {{ authenticated: boolean, mailboxId: number | null,
  *   inbox: { threads: ThreadRow[], loading: boolean, view: string },
  *   openThread: number | 'compose' | null,
+ *   tab: 'inbox' | 'junk' | 'deliveries' | 'media',
  *   undo: { token: string, label: string } | null }} State
  */
 
@@ -28,6 +29,7 @@ class Store extends EventTarget {
       mailboxId: null,
       inbox: { threads: [], loading: false, view: 'inbox' },
       openThread: null,
+      tab: 'inbox',
       undo: null,
     };
   }

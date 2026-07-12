@@ -7,4 +7,9 @@ require (
 	github.com/zeebo/blake3 v0.2.4
 )
 
-require github.com/klauspost/cpuid/v2 v2.0.12 // indirect
+require (
+	github.com/klauspost/cpuid/v2 v2.0.12 // indirect
+	golang.org/x/net v0.26.0
+)
+
+replace golang.org/x/net => github.com/golang/net v0.26.0

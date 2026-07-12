@@ -52,6 +52,10 @@ type BS struct {
 	// pusher addressed us (the path comes from the request).
 	PublicBase string
 	Now        func() time.Time
+	// OnVerified fires after an object goes live (both doors); the
+	// API layer flips expected references to available (§10.3) and
+	// notifies. Runs outside the finalize transaction.
+	OnVerified func(urn string)
 
 	mu     sync.Mutex
 	active map[string]*resource
@@ -94,7 +98,9 @@ func (b *BS) quarantinePath(tokenHash string) string {
 	return filepath.Join(b.Root, "quarantine", tokenHash)
 }
 
-func (b *BS) objectPath(urn string) string {
+// ObjectPath locates a live object's bytes (the intra-domain serving
+// and owner-delete paths need it).
+func (b *BS) ObjectPath(urn string) string {
 	return filepath.Join(b.Root, "objects", strings.TrimPrefix(urn, "urn:mlet:"))
 }
 
@@ -402,7 +408,7 @@ func (b *BS) resetToZero(ctx context.Context, res *reservation, rsc *resource) {
 // live, and consumes the token (single use, D-18 — the trigger makes
 // consumed terminal).
 func (b *BS) finalize(ctx context.Context, res *reservation, now time.Time) *Problem {
-	obj := b.objectPath(res.urn)
+	obj := b.ObjectPath(res.urn)
 	if err := os.MkdirAll(filepath.Dir(obj), 0o700); err != nil {
 		return problemf(http.StatusInternalServerError, "hash-mismatch", "objects: %v", err)
 	}
@@ -428,6 +434,9 @@ func (b *BS) finalize(ctx context.Context, res *reservation, now time.Time) *Pro
 	}
 	if err := tx.Commit(); err != nil {
 		return problemf(http.StatusInternalServerError, "hash-mismatch", "store: %v", err)
+	}
+	if b.OnVerified != nil {
+		b.OnVerified(res.urn)
 	}
 	return nil
 }

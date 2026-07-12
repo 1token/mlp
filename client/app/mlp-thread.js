@@ -51,6 +51,7 @@ export class MlpThread extends HTMLElement {
       const viewer = /** @type {MlpBodyViewer} */ (document.createElement('mlp-body-viewer'));
       viewer.content = m.body?.content ?? '';
       viewer.manifest = (m.manifest ?? []).map((e) => e.urn);
+      viewer.resolveUrn = (urn) => '/api/v1/o/' + encodeURIComponent(urn);
       section.querySelector('.body-slot')?.append(viewer);
       this.renderRefs(/** @type {HTMLElement} */ (section.querySelector('.refs')), m);
       this.append(section);

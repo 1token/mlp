@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"medialet.org/mlp/render"
 	"net/http"
 	"strings"
 	"time"
@@ -131,16 +132,36 @@ func (s *SN) threadFor(ctx context.Context, tx *sql.Tx, mailboxID int64, pe *Par
 // derivation lands (its first consumers — D-165 junk payloads and
 // the D-21 classifier — arrive with S4.11).
 func updateRollup(ctx context.Context, tx *sql.Tx, threadID int64, pe *ParsedEnvelope, nowS string) *Problem {
-	rollup, _ := json.Marshal(map[string]any{
+	entry := map[string]any{
 		"subject":     pe.Subject,
 		"last_author": pe.Author,
 		"media_count": len(pe.Manifest),
 		"updated":     nowS,
-	})
+	}
+	if pe.Derived != nil {
+		entry["snippet"] = render.Snippet(pe.Derived.DerivedText, 120)
+	}
+	rollup, _ := json.Marshal(entry)
 	if _, err := tx.ExecContext(ctx,
 		`UPDATE threads SET rollup_json=?, last_activity=? WHERE id=?`,
 		string(rollup), nowS, threadID); err != nil {
 		return problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
 	}
 	return nil
+}
+
+// manifestURNs projects the Manifest's addresses.
+func manifestURNs(entries []ManifestEntry) []string {
+	out := make([]string, len(entries))
+	for i, e := range entries {
+		out[i] = e.URN
+	}
+	return out
+}
+
+func boolTo01(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }

@@ -191,5 +191,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PATCH /api/v1/settings", s.handler(s.handleSettingsPatch))
 	s.registerThreadRoutes(mux)
 	s.registerComposeRoutes(mux)
+	s.registerMediaRoutes(mux)
 	return mux
 }

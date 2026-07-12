@@ -119,6 +119,10 @@ func newAPI(t *testing.T, domain, localPart, seedHex string, clock *time.Time, c
 	hub := NewHub(db)
 	hub.Now = func() time.Time { return *clock }
 	blob := &bs.BS{DB: db, Root: t.TempDir(), Now: func() time.Time { return *clock }}
+	blob.OnVerified = func(urn string) {
+		db.Exec(`UPDATE refs SET state='available', updated_at=? WHERE urn=? AND state='expected'`,
+			clock.Format(time.RFC3339), urn)
+	}
 	return &Server{DB: db, SN: node, BS: blob, Hub: hub, Now: func() time.Time { return *clock }, PasswordIterations: 1000}
 }
 

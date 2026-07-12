@@ -2,7 +2,7 @@
 
 > Purpose: resume implementation in a fresh working session with zero
 > context loss. Read this first; everything else is referenced from it.
-> Updated at the S4.10 → S4.11 boundary (2026-07-11).
+> Updated at the S4.11 → S4.12 boundary (2026-07-11).
 
 ## 1. Project in one paragraph
 
@@ -52,6 +52,7 @@ sequential D-number; changes to frozen artifacts travel only as MEPs.
 | S4.8 | `client/lib/sanitizer.js` (§11 pipeline: two-tier removal, attribute/style/URL filtering, caps, REQUIRED idempotence fixpoint, degradation to derived text), `lib/derived-text.js` (§11.6 reference), `app/mlp-body-viewer.js` (the §11.7 shadow boundary with render-time urn→BS mapping), node harness, CI client-checks job activated | **all 14 TV-005 cases green under tree equality + idempotence on the first run**; caps degrade to text; tsc --noEmit clean over the shipping client code (D-117) |
 | S4.9 | Ingest materialization (`sn/materialize.go`: messages/threads per D-110, offered refs per §10.3, rollups); `clientapi/threads.go` (inbox+junk views, full thread, triage trio with D-129 undo, `/undo`); accept authorization closed + refs offered→expected; client shell/store/inbox/thread over the S4.7 API and SSE | TV-001 ingest materializes thread+message+refs; replies join parent threads, orphans root their own, re-deliveries dedup; quarantine lands in junk; undo restores exactly and expires at 30 s; non-recipient accept 404s; html`` escaping suite + TV-005 gate + tsc all green |
 | S4.10 | `sn/compose.go` (D-138 pre-flight, author/1 via `keyWithRole`, per-domain fan-out, dispatch + synchronous verdict recording, deliveries/refs-promised/sender-copy/timeline materialization); `clientapi/drafts.go` (drafts CRUD, hash-first `/uploads` declare + intra-domain PATCH over the shared `bs` core, `/drafts/{id}/send`); `app/mlp-composer.js` (autosave, attach-by-reference, the 10 s undo hold) | **composing Petra's draft reproduces the TV-001 Signed Medialet AND Signed Envelope byte-identically**, dispatches to a live target over HTTP, and records **TV-002 verdict 1 byte-identically** on return; the upload door resumes at the checkpoint and refuses corrupt digests; send gates on possession (409); two-domain fan-out = one delivery, two envelopes, both recipients materialized |
+| S4.11 | `render/`: the Go §11 pipeline over x/net/html (spec-compliant HTML5 parsing) — sanitizer, §11.6 derived text, D-132 snippet; migration 0003 (`render_degraded`); derivation at ingest + send, rollup snippet, render-form thread payloads, the D-21 classifier hook; media library (cards, pin/unpin, owner delete, hardened object serving, raw-medialet endpoint), the `OnVerified` seam flipping expected→available; junk release/block with the correspondents ledger; client deliveries lens, media cards, nav tabs, junk actions | **the Go sanitizer passes all 14 TV-005 cases first run** — the third implementation through the corpus; the classifier demotes on derived text and a released sender outranks it; the media lifecycle walks §10.3 end-to-end offered→…→unavailable(deleted) |
 | S4.5 | `bs/`: §6.6 RFC 9421 profile, the §8.2–8.4 upload resource with the D-77 transactional pipeline, D-27 BLAKE3 checkpoints, §8.5 failure taxonomy, §8.7 pusher loop under D-72 | all three TV-003 signature bases reproduce **byte-identically** and vector signatures verify; the transcript replays header-for-header (204/20, HEAD 200 with the exact `Upload-Expires`, 204/36 `verified`); digest-mismatch rolls back, hash-mismatch resets to 0 and recovers, restart re-derives the checkpoint; the pusher survives a lost 204 with PATCH offsets exactly [0, 20] |
 
 Register tail since the Stage 3 closing doc: **D-182–D-204** —
@@ -272,7 +273,37 @@ BLAKE3 (file drag-in) waits for the vendored WASM in S4.11 — until
 then the composer attaches by reference only, and the upload lane
 is exercised by tests and non-browser clients · D-228 the 10 s undo
 hold is purely client-side (D-138: cheap, expected, the last moment
-before a signature); the server signs the instant it is told.
+before a signature); the server signs the instant it is told · D-229
+the Go render pipeline: parsing is x/net/html (spec-compliant HTML5
+tree construction, §11.5 step 1) fetched via the GitHub-mirror
+replace directive; TV-005 under tree equality is the
+third-implementation bridge (Python generator, JS client, Go
+server); the stored render form serializes deterministically
+(sorted attributes — comparison stays tree equality, bytes stay
+reproducible); migration 0003 adds only `render_degraded` — 0001
+had already provisioned render_form/derived_text (the collision was
+caught by the migration failing loudly; checked, shrunk); pre-0003
+rows backfill lazily on first read · D-230 derivation wiring: at
+ingest BEFORE recipient evaluation, so the D-21 classifier judges
+the derived text — it demotes tier-2 strangers only (correspondents
+and same-domain are never classifier-demoted); at send; the rollup
+gains the D-132 snippet; `/threads/{id}` serves the render form —
+the D-31 dual duty is now real in both directions (server derives,
+the TV-005-proven client re-sanitizes); degraded bodies ship the
+derived text, flagged · D-231 media judgments: the `OnVerified` seam
+keeps `bs` mailbox-agnostic while the API layer flips
+expected→available (§10.3); owner delete transitions pinned rows too
+(D-88: pin protects from GC, never from the owner) and removes the
+bytes; object serving hardens with nosniff + `CSP: sandbox` +
+immutable caching (content-addressed); Range serving is QoI; the raw
+Signed Medialet endpoint answers recipients only (D-28 fidelity
+source) · D-232 junk semantics (D-165): release = junk 0 + the
+correspondent `allow` override — the strongest signal, and it
+outranks the classifier (tested); block = `block` override + done,
+the thread staying in junk for the record · D-233 deferrals:
+WebAuthn → S4.12 with the guest/claim auth surfaces; the blake3-wasm
+file door → S4.12–13 demo preparation; bundles/sections/sweep remain
+the parked S3.11 backlog.
 
 ## 4. Environment recipe (sandbox)
 
@@ -294,15 +325,15 @@ shipping driver (one import swap) — D-191.
 `domain` binding check, kid self-verification wired on key-set load,
 24 h cache ceiling into `domain_docs`/`domain_keys` (D-33); TV-001's
 Domain Document fixture as the parsing anchor.
-**S4.4–S4.10 — done** (see table); the full loop — compose → sign →
-dispatch → verdict → accept → transfer — runs end-to-end on vector
-fixtures. **S4.11 (next)**: Deliveries/Media/identity/junk — the
-Deliveries lens UI over the S4.7 endpoints, the Media library
-(refs/tombstones/pins, blake3-wasm vendoring for the D-135 file
-door, D-105 store selection), identity (WebAuthn, correspondents),
-junk (D-165 derived-text-first payloads) + the deferred server
-render-form derivation (D-94) and D-21 classifier hook, bundles/
-sections/sweep triage refinement
+**S4.4–S4.11 — done** (see table); every §11 duty is now
+implemented on both sides of the wire and the D-223 deferral is
+repaid. **S4.12 (next)**: guest + claim (S3.6, D-151–D-155) — the
+guest delivery page (the second `<mlp-body-viewer>` consumer),
+capability links, the claim ceremony into a mailbox; WebAuthn joins
+here per D-233 (the auth surfaces travel together); blake3-wasm
+vendoring for the composer's file door. Then S4.13 two-domain demo
+(Stage 3 Closing §5 definition of done) · S4.14 hardening + operator
+guide + NLnet
 gated on TV-005 tree equality FIRST, then Inbox → composer →
 Deliveries → Media → identity/junk) · S4.12 guest+claim · S4.13
 two-domain demo (definition of done in Stage 3 Closing §5) · S4.14
@@ -312,7 +343,7 @@ conformance hardening + operator guide + NLnet.
 
 Per session: design/implementation presented with lettered judgment
 calls → Igor confirms explicitly → decisions frozen with sequential
-D-numbers (next free: **D-229**) → artifacts delivered as local
+D-numbers (next free: **D-234**) → artifacts delivered as local
 commits emitted as a `git format-patch` series against `origin/main`
 for Igor's review, `git am`, and push (D-196) → next-session pointer. Honesty rules: caught problems are
 surfaced, never patched silently; spec gaps go to the MEP queue;

@@ -6,8 +6,10 @@ import (
 	"crypto/ed25519"
 	"database/sql"
 	"encoding/json"
+
 	"fmt"
 	"io"
+	"medialet.org/mlp/render"
 	"net/http"
 	"time"
 
@@ -145,6 +147,7 @@ func (s *SN) Send(ctx context.Context, mailboxID int64, addr string, d *DraftCon
 		return nil, problemf(http.StatusInternalServerError, "malformed", "%v", err)
 	}
 	ca := core.URNMlet(smCanon)
+	derived := render.Derive(d.BodyContent, manifestURNs(d.Manifest))
 
 	// --- Materialize the delivery ------------------------------------
 	nowS := now.Format(time.RFC3339)
@@ -154,9 +157,10 @@ func (s *SN) Send(ctx context.Context, mailboxID int64, addr string, d *DraftCon
 	}
 	defer tx.Rollback()
 	if _, err := tx.ExecContext(ctx,
-		`INSERT OR IGNORE INTO medialets (content_address, author, medialet_id, created, raw)
-		 VALUES (?,?,?,?,?)`,
-		ca, addr, medialet["id"], medialet["created"], smCanon); err != nil {
+		`INSERT OR IGNORE INTO medialets (content_address, author, medialet_id, created, raw, render_form, derived_text, render_degraded)
+		 VALUES (?,?,?,?,?,?,?,?)`,
+		ca, addr, medialet["id"], medialet["created"], smCanon,
+		nullable(derived.RenderForm), derived.DerivedText, boolTo01(derived.Degraded)); err != nil {
 		return nil, problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
 	}
 	res, err := tx.ExecContext(ctx,
@@ -186,7 +190,7 @@ func (s *SN) Send(ctx context.Context, mailboxID int64, addr string, d *DraftCon
 		 VALUES (?,?,NULL,?,1,?)`, mailboxID, ca, threadID, nowS); err != nil {
 		return nil, problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
 	}
-	pe := &ParsedEnvelope{Subject: d.Subject, Author: addr, Manifest: d.Manifest}
+	pe := &ParsedEnvelope{Subject: d.Subject, Author: addr, Manifest: d.Manifest, Derived: &derived}
 	if prob := updateRollup(ctx, tx, threadID, pe, nowS); prob != nil {
 		return nil, prob
 	}

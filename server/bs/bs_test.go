@@ -235,7 +235,7 @@ func TestTranscriptWalk(t *testing.T) {
 		t.Fatalf("step 3: %d %+v", resp.StatusCode, resp.Header)
 	}
 	// Object live with the exact bytes; token consumed; quarantine empty.
-	data, err := os.ReadFile(b.objectPath(v.Object.URN))
+	data, err := os.ReadFile(b.ObjectPath(v.Object.URN))
 	if err != nil || string(data) != v.Object.BytesUTF8 {
 		t.Fatalf("object bytes: %v %q", err, data)
 	}

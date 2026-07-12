@@ -3,6 +3,7 @@ package sn
 import (
 	"encoding/json"
 	"fmt"
+	"medialet.org/mlp/render"
 	"net/http"
 	"time"
 	"unicode/utf8"
@@ -65,6 +66,8 @@ type ParsedEnvelope struct {
 	Subject        string
 	InReplyTo      string
 	MedialetTime   string // medialet.created
+	BodyContent    string
+	Derived        *render.Result // §11 derivation (D-94), set at ingest/send
 	Manifest       []ManifestEntry
 	HopsJSON       string // verbatim-equivalent JSON of hops, "" when absent
 	ForwardedBy    string
@@ -372,8 +375,10 @@ func (pe *ParsedEnvelope) validateMedialet() *Problem {
 	if p, ok := body["profile"].(string); !ok || p != "mlp-html/1" {
 		return malformed("body profile is not mlp-html/1 (§3.2.1)")
 	}
-	if _, ok := body["content"].(string); !ok {
+	if c, ok := body["content"].(string); !ok {
 		return malformed("body content is not a string (§3.2.1)")
+	} else {
+		pe.BodyContent = c
 	}
 
 	if man, present := m["manifest"]; present {

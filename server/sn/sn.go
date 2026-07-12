@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"medialet.org/mlp/render"
 	"net/http"
 	"time"
 
@@ -45,6 +46,10 @@ type SN struct {
 	NewRequestID func(t time.Time) string
 	// NewMedialetID mints Medialet identifiers for the composer.
 	NewMedialetID func(t time.Time) string
+	// Classifier is the D-21 hook: judged on the derived text (never
+	// the raw Body); true demotes accepted strangers to quarantine.
+	// nil = no classifier.
+	Classifier func(derivedText string) bool
 	// DispatchEndpoint overrides §5 discovery of a target's /dispatch.
 	DispatchEndpoint func(ctx context.Context, domain string) (string, error)
 	// NewReservationSecret returns a capability token (1–512 chars)
@@ -154,6 +159,11 @@ func (s *SN) ProcessDispatch(ctx context.Context, raw []byte) ([]byte, *Problem)
 
 	// Acceptance policy (§7.7) — only now (§3.4.4: recipient
 	// existence and verdicts are policy outcomes).
+	// The §11 derivation (D-94): at ingest, before recipient
+	// evaluation — the D-21 classifier judges the derived text.
+	rf := render.Derive(pe.BodyContent, manifestURNs(pe.Manifest))
+	pe.Derived = &rf
+
 	recipients, targets, anyT1, anyAccepted, anyQuarantined, prob := s.evaluateRecipients(ctx, pe)
 	if prob != nil {
 		return nil, prob
@@ -250,6 +260,10 @@ func (s *SN) evaluateRecipients(ctx context.Context, pe *ParsedEnvelope) (out []
 		if t == tierStranger && pe.AuthorDomain == s.Domain {
 			t = tierCorrespondent // same domain (§7.7 Tier 1)
 		}
+		if t == tierStranger && s.Classifier != nil && pe.Derived != nil &&
+			s.Classifier(pe.Derived.DerivedText) {
+			t = tierSuspect // D-21: judged on the derived text
+		}
 
 		switch t {
 		case tierCorrespondent:
@@ -331,9 +345,10 @@ func (s *SN) persistDispatch(ctx context.Context, pe *ParsedEnvelope, payload ma
 	mCreated, _ := pe.Medialet["created"].(string)
 
 	if _, err := tx.ExecContext(ctx,
-		`INSERT OR IGNORE INTO medialets (content_address, author, medialet_id, created, raw)
-		 VALUES (?,?,?,?,?)`,
-		pe.ContentAddress, pe.Author, pe.MedialetID, mCreated, pe.CanonicalMedialet); err != nil {
+		`INSERT OR IGNORE INTO medialets (content_address, author, medialet_id, created, raw, render_form, derived_text, render_degraded)
+		 VALUES (?,?,?,?,?,?,?,?)`,
+		pe.ContentAddress, pe.Author, pe.MedialetID, mCreated, pe.CanonicalMedialet,
+		nullable(pe.Derived.RenderForm), pe.Derived.DerivedText, boolTo01(pe.Derived.Degraded)); err != nil {
 		return problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
 	}
 	var have int

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"medialet.org/mlp/render"
 	"net/http"
 	"strconv"
 	"time"
@@ -23,6 +24,8 @@ func (s *Server) registerThreadRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/threads/{id}/done", s.handler(s.triage("done")))
 	mux.HandleFunc("POST /api/v1/threads/{id}/flag", s.handler(s.triage("flag")))
 	mux.HandleFunc("POST /api/v1/undo", s.handler(s.handleUndo))
+	mux.HandleFunc("POST /api/v1/threads/{id}/release", s.handler(s.handleJunkRelease))
+	mux.HandleFunc("POST /api/v1/threads/{id}/block", s.handler(s.handleJunkBlock))
 }
 
 func (s *Server) handleThreads(w http.ResponseWriter, r *http.Request, mailbox int64) *problem {
@@ -124,7 +127,8 @@ func (s *Server) handleThread(w http.ResponseWriter, r *http.Request, mailbox in
 		return prob
 	}
 	rows, err := s.DB.QueryContext(r.Context(),
-		`SELECT m.id, m.medialet_ca, m.read, m.received_at, md.raw
+		`SELECT m.id, m.medialet_ca, m.read, m.received_at, md.raw,
+		        COALESCE(md.render_form,''), COALESCE(md.derived_text,''), md.render_degraded
 		 FROM messages m JOIN medialets md ON md.content_address = m.medialet_ca
 		 WHERE m.thread_id=? ORDER BY m.received_at, m.id`, id)
 	if err != nil {
@@ -134,10 +138,10 @@ func (s *Server) handleThread(w http.ResponseWriter, r *http.Request, mailbox in
 	var msgs []map[string]any
 	for rows.Next() {
 		var msgID int64
-		var ca, receivedAt string
-		var read int
+		var ca, receivedAt, renderForm, derivedText string
+		var read, degraded int
 		var raw []byte
-		if err := rows.Scan(&msgID, &ca, &read, &receivedAt, &raw); err != nil {
+		if err := rows.Scan(&msgID, &ca, &read, &receivedAt, &raw, &renderForm, &derivedText, &degraded); err != nil {
 			return problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
 		}
 		var sm struct {
@@ -152,6 +156,19 @@ func (s *Server) handleThread(w http.ResponseWriter, r *http.Request, mailbox in
 					entry[f] = json.RawMessage(v)
 				}
 			}
+		}
+		// The server-derived render form (D-94) replaces the verbatim
+		// body in the payload; the viewer re-sanitizes it (D-31 dual
+		// duty). Pre-0003 rows backfill lazily. Degraded bodies ship
+		// the derived text and say so.
+		if renderForm == "" && degraded == 0 {
+			renderForm, derivedText, degraded = s.backfillRender(r, ca, raw)
+		}
+		if degraded == 1 {
+			entry["body"] = map[string]any{"profile": "mlp-html/1", "content": "", "degraded": true}
+			entry["derived_text"] = derivedText
+		} else {
+			entry["body"] = map[string]any{"profile": "mlp-html/1", "content": renderForm}
 		}
 		refs, prob := s.messageRefs(r, mailbox, ca)
 		if prob != nil {
@@ -335,6 +352,68 @@ func (s *Server) handleUndo(w http.ResponseWriter, r *http.Request, mailbox int6
 	return nil
 }
 
+// handleJunkRelease frees a quarantined thread to the inbox and
+// remembers the trust decision (D-165: releasing is the strongest
+// allow signal).
+func (s *Server) handleJunkRelease(w http.ResponseWriter, r *http.Request, mailbox int64) *problem {
+	id, prob := s.ownThread(r, mailbox)
+	if prob != nil {
+		return prob
+	}
+	if _, err := s.DB.ExecContext(r.Context(),
+		`UPDATE threads SET junk=0 WHERE id=?`, id); err != nil {
+		return problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
+	}
+	if addr, ok := s.threadAuthor(r, id); ok {
+		s.DB.ExecContext(r.Context(),
+			`INSERT INTO correspondents (mailbox_id, addr, tier_override) VALUES (?,?,'allow')
+			 ON CONFLICT(mailbox_id, addr) DO UPDATE SET tier_override='allow'`, mailbox, addr)
+	}
+	s.Hub.Emit(r.Context(), mailbox, "thread.changed", map[string]any{"id": id})
+	w.WriteHeader(http.StatusNoContent)
+	return nil
+}
+
+// handleJunkBlock confirms the quarantine: the sender is blocked and
+// the thread marked done (it stays in junk for the record).
+func (s *Server) handleJunkBlock(w http.ResponseWriter, r *http.Request, mailbox int64) *problem {
+	id, prob := s.ownThread(r, mailbox)
+	if prob != nil {
+		return prob
+	}
+	if _, err := s.DB.ExecContext(r.Context(),
+		`UPDATE threads SET done=1 WHERE id=?`, id); err != nil {
+		return problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
+	}
+	if addr, ok := s.threadAuthor(r, id); ok {
+		s.DB.ExecContext(r.Context(),
+			`INSERT INTO correspondents (mailbox_id, addr, tier_override) VALUES (?,?,'block')
+			 ON CONFLICT(mailbox_id, addr) DO UPDATE SET tier_override='block'`, mailbox, addr)
+	}
+	s.Hub.Emit(r.Context(), mailbox, "thread.changed", map[string]any{"id": id})
+	w.WriteHeader(http.StatusNoContent)
+	return nil
+}
+
+// threadAuthor reads the latest message's author for trust actions.
+func (s *Server) threadAuthor(r *http.Request, threadID int64) (string, bool) {
+	var raw []byte
+	if err := s.DB.QueryRowContext(r.Context(),
+		`SELECT md.raw FROM messages m JOIN medialets md ON md.content_address=m.medialet_ca
+		 WHERE m.thread_id=? ORDER BY m.received_at DESC, m.id DESC LIMIT 1`, threadID).Scan(&raw); err != nil {
+		return "", false
+	}
+	var sm struct {
+		Medialet struct {
+			Author string `json:"author"`
+		} `json:"medialet"`
+	}
+	if json.Unmarshal(raw, &sm) != nil || sm.Medialet.Author == "" {
+		return "", false
+	}
+	return sm.Medialet.Author, true
+}
+
 func (s *Server) ownThread(r *http.Request, mailbox int64) (int64, *problem) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
@@ -353,4 +432,34 @@ func boolInt(b bool) int {
 		return 1
 	}
 	return 0
+}
+
+// backfillRender derives §11 artifacts for rows predating migration
+// 0003 (lazy, per read, then persisted).
+func (s *Server) backfillRender(r *http.Request, ca string, raw []byte) (renderForm, derivedText string, degraded int) {
+	var sm struct {
+		Medialet struct {
+			Body struct {
+				Content string `json:"content"`
+			} `json:"body"`
+			Manifest []struct {
+				URN string `json:"urn"`
+			} `json:"manifest"`
+		} `json:"medialet"`
+	}
+	if json.Unmarshal(raw, &sm) != nil {
+		return "", "", 1
+	}
+	urns := make([]string, len(sm.Medialet.Manifest))
+	for i, m := range sm.Medialet.Manifest {
+		urns[i] = m.URN
+	}
+	res := render.Derive(sm.Medialet.Body.Content, urns)
+	if res.Degraded {
+		degraded = 1
+	}
+	s.DB.ExecContext(r.Context(),
+		`UPDATE medialets SET render_form=?, derived_text=?, render_degraded=? WHERE content_address=?`,
+		nullIfEmpty(res.RenderForm), res.DerivedText, degraded, ca)
+	return res.RenderForm, res.DerivedText, degraded
 }

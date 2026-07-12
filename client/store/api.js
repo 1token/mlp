@@ -70,4 +70,18 @@ export const api = {
   draftSend: (id) => call('POST', `/drafts/${id}/send`),
   /** @param {string} urn @param {number} size */
   uploadDeclare: (urn, size) => call('POST', '/uploads', { urn, size }),
+  deliveries: () => call('GET', '/deliveries'),
+  /** @param {number} id */
+  delivery: (id) => call('GET', `/deliveries/${id}`),
+  /** @param {number} id */
+  timeline: (id) => call('GET', `/deliveries/${id}/timeline`),
+  media: () => call('GET', '/media'),
+  /** @param {string} urn @param {boolean} pin */
+  pin: (urn, pin) => call('POST', `/o/${encodeURIComponent(urn)}/${pin ? 'pin' : 'unpin'}`, {}),
+  /** @param {string} urn */
+  objectDelete: (urn) => call('DELETE', `/o/${encodeURIComponent(urn)}`),
+  /** @param {number} id */
+  junkRelease: (id) => call('POST', `/threads/${id}/release`, {}),
+  /** @param {number} id */
+  junkBlock: (id) => call('POST', `/threads/${id}/block`, {}),
 };

@@ -13,6 +13,8 @@ import { connectLive } from '../store/live.js';
 import './mlp-inbox.js';
 import './mlp-thread.js';
 import './mlp-composer.js';
+import './mlp-deliveries.js';
+import './mlp-media.js';
 
 export class MlpApp extends HTMLElement {
   connectedCallback() {
@@ -54,17 +56,40 @@ export class MlpApp extends HTMLElement {
       this.querySelector('#login')?.addEventListener('click', () => this.login());
       return;
     }
+    const tab = store.state.tab;
+    const nav = html`<nav>
+      <button data-tab="inbox">Inbox</button>
+      <button data-tab="junk">Junk</button>
+      <button data-tab="deliveries">Deliveries</button>
+      <button data-tab="media">Media</button>
+      <button id="compose">Compose</button>
+    </nav>`;
     if (openThread === 'compose') {
-      this.innerHTML = html`<main><p><button id="back">← Inbox</button></p><h1>Compose</h1><mlp-composer></mlp-composer></main>`;
-    } else if (openThread === null) {
-      this.innerHTML = html`<main><h1>Inbox <button id="compose">Compose</button></h1><mlp-inbox></mlp-inbox></main>`;
+      this.innerHTML = html`<main><p><button id="back">← Back</button></p><h1>Compose</h1><mlp-composer></mlp-composer></main>`;
+    } else if (openThread !== null) {
+      this.innerHTML = html`<main><p><button id="back">← Back</button></p><mlp-thread thread-id="${openThread}"></mlp-thread></main>`;
     } else {
-      this.innerHTML = html`<main><p><button id="back">← Inbox</button></p><mlp-thread thread-id="${openThread}"></mlp-thread></main>`;
+      const body = tab === 'deliveries' ? '<mlp-deliveries></mlp-deliveries>'
+        : tab === 'media' ? '<mlp-media></mlp-media>'
+        : '<mlp-inbox></mlp-inbox>';
+      this.innerHTML = '<main>' + nav + `<h1>${tab[0].toUpperCase()}${tab.slice(1)}</h1>` + body + '</main>';
     }
     this.querySelector('#back')?.addEventListener('click', () =>
       store.update('nav', { openThread: null }));
     this.querySelector('#compose')?.addEventListener('click', () =>
       store.update('nav', { openThread: 'compose' }));
+    for (const btn of this.querySelectorAll('button[data-tab]')) {
+      btn.addEventListener('click', async () => {
+        const t = /** @type {'inbox'|'junk'|'deliveries'|'media'} */ (btn.getAttribute('data-tab'));
+        store.update('nav', { tab: t, openThread: null });
+        if (t === 'inbox' || t === 'junk') {
+          try {
+            const data = await api.threads(t);
+            store.update('inbox', { threads: data.threads ?? [], view: t });
+          } catch { /* transient */ }
+        }
+      });
+    }
     this.renderUndo();
   }
 

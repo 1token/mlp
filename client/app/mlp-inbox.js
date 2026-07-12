@@ -62,8 +62,22 @@ export class MlpInbox extends HTMLElement {
       <span class="who">${t.rollup?.last_author ?? ''}</span>
       <span class="subject">${t.rollup?.subject ?? '(no subject)'}</span>
       <span class="chips"></span>
-      <button data-op="flag" title="Flag">${t.flagged ? '★' : '☆'}</button>
-      <button data-op="done" title="Done">✓</button>`;
+      <span class="ops"></span>`;
+    const ops = /** @type {HTMLElement} */ (el.querySelector('.ops'));
+    ops.innerHTML = store.state.inbox.view === 'junk'
+      ? '<button data-junk="release">Release</button> <button data-junk="block">Block</button>'
+      : html`<button data-op="flag" title="Flag">${t.flagged ? '★' : '☆'}</button> <button data-op="done" title="Done">✓</button>`;
+    for (const btn of el.querySelectorAll('button[data-junk]')) {
+      btn.addEventListener('click', async () => {
+        const op = btn.getAttribute('data-junk');
+        try {
+          if (op === 'release') await api.junkRelease(t.id);
+          else await api.junkBlock(t.id);
+          const data = await api.threads(store.state.inbox.view);
+          store.update('inbox', { threads: data.threads ?? [] });
+        } catch { /* refused */ }
+      });
+    }
     const chipHost = el.querySelector('.chips');
     if (chipHost) chipHost.innerHTML = chips;
     for (const btn of el.querySelectorAll('button[data-op]')) {
