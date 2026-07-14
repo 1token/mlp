@@ -113,6 +113,10 @@ type config struct {
 	Domain, SelfBase, DataDir, ClientDir string
 	InitUser, Password, Origin           string
 	Peers                                map[string]string
+	// Clock, when set, drives every component's notion of now —
+	// the scenario harness manipulates it for expiry and window
+	// walks. nil = real time (production).
+	Clock *time.Time
 }
 
 type node struct {
@@ -167,6 +171,10 @@ func buildNode(cfg config) (*node, error) {
 		sn.AllowInsecureTransport = true  // §7.5 relaxed, demo only
 	}
 
+	var clock func() time.Time
+	if cfg.Clock != nil {
+		clock = func() time.Time { return *cfg.Clock }
+	}
 	node0 := &sn.SN{
 		DB:               db,
 		Resolver:         resolver,
@@ -175,9 +183,10 @@ func buildNode(cfg config) (*node, error) {
 		DispatchEndpoint: endpoint("/dispatch"),
 		FulfillEndpoint:  endpoint("/fulfill"),
 		AutoGrant:        sn.D139AutoGrant, // the product ships D-139 on
+		Now:              clock,
 	}
 	blob := &bs.BS{DB: db, Root: filepath.Join(dataDir, "objects"),
-		PublicBase: selfBase, Resolver: resolver}
+		PublicBase: selfBase, Resolver: resolver, Now: clock}
 	blob.OnVerified = func(urn string) {
 		db.Exec(`UPDATE refs SET state='available', updated_at=? WHERE urn=? AND state='expected'`,
 			time.Now().UTC().Format(time.RFC3339), urn)
@@ -185,6 +194,7 @@ func buildNode(cfg config) (*node, error) {
 	hub := clientapi.NewHub(db)
 	api := &clientapi.Server{
 		DB: db, SN: node0, BS: blob, Hub: hub, WebAuthnOrigin: origin,
+		Now: clock,
 		PostVerdict: func(ctx context.Context, target string, doc []byte) error {
 			url, err := endpoint("/verdict")(ctx, target)
 			if err != nil {
@@ -231,7 +241,7 @@ func buildNode(cfg config) (*node, error) {
 	}
 
 	return &node{DB: db, SN: node0, BS: blob, API: api, mux: mux,
-		pusher: &bs.Pusher{DB: db, Client: pusherClient}}, nil
+		pusher: &bs.Pusher{DB: db, Client: pusherClient, Now: clock}}, nil
 }
 
 // pushOnce drives every pending or interrupted outbound reservation
