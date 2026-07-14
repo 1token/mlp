@@ -1,6 +1,6 @@
 # The scenario suite — programmatic demos over real TCP sockets
 
-Twelve self-contained stories in the `TestTwoDomainDemo` mold: each
+Thirteen self-contained stories in the `TestTwoDomainDemo` mold: each
 boots real `mlpd` nodes on real sockets (the same `buildNode`
 production composition, demo-mode peering only), walks one scenario
 through the actual client API and federation endpoints, and asserts
@@ -59,6 +59,46 @@ Two postures worth knowing:
 | `TestScenarioResendAfterDeletion` | 2 | Delete leaves the honest tombstone (`unavailable/deleted`); the resend's verdict is `grant`, not `have` — possession claims stay true even for a correspondent — and the bytes travel a second life | §10.4, §7.5, D-139 |
 | `TestScenarioGuestLockAndExpiry` | 1 | Five wrong PINs lock the link; the lock outranks even the CORRECT PIN (checked before evaluation); a fresh link answers 200 today and 410 on day 31 under the moving clock | D-152, D-155, D-238 |
 | `TestScenarioEphemeralGC` | 2 | The auto-granted preview (ephemeral class) is collected the moment nothing needs it, tombstoned `expired-local`; the pinned master is untouchable | D-139, D-251, §10.5 |
+
+## The working-group exploder (`scenarios_wg_test.go`)
+
+`TestScenarioWorkingGroupExploder` — an IETF-style WG mailing list
+built on MLP primitives, five domains: the list (`medialet-wg@
+lists.demo`, whose mailbox owner is the moderator), three members,
+and a cross-subscribed archive mirror. The exploder is an
+APPLICATION, as mailman is an application on SMTP — MLP defines no
+list membership; the roster is the exploder's own data. Everything
+the exploder does is pure protocol: §3.4.2 re-dispatch with
+`automatic=true`, because an exploder IS automation and must say so.
+
+Seven phases, each an assertion set:
+
+1. **Posting** — a member's post reaches the list like any delivery.
+2. **Fan-out** — the exploder re-dispatches per subscriber domain
+   (D-04 preserved); authorship and content address arrive
+   byte-identical at every subscriber.
+3. **Heavy media never touches the list** — subscribers accept
+   through §9.3 delegation and the 5 MiB draft flows point-to-point
+   from the author's domain; `objectLive(lists.demo) == false` is
+   asserted. The structural difference from SMTP exploders and
+   their attachment-size limits: the list explodes envelopes, never
+   payloads.
+4. **Threading across the exploder** — a reply re-distributed by the
+   list joins the SAME topic at every subscriber, because the
+   content address is the message identity (D-110 over re-dispatch).
+5. **Moderation is the tier system** — a blocked troll's next post
+   arrives `quarantined`, never enters the inbox, and is therefore
+   never exploded; `release` is moderator approval, after which the
+   post flows to the group.
+6. **The loop dies at one revolution** — the classic
+   cross-subscribed-lists misconfiguration: the mirror explodes the
+   announcement back at the list (legal — the mirror is not yet in
+   the chain), the boomerang PROVABLY arrives (two Delivery Records
+   for one Medialet at the list), and the list's automatic
+   re-explosion is refused with `ErrForwardLoop` — lists.demo is
+   already in the chain (D-51). Every member holds exactly one copy.
+
+Anchors: §3.4.2, §9.3, D-04, D-51, D-110, D-163, D-165.
 
 ## What the suite has already earned
 
