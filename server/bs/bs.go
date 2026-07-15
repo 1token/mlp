@@ -338,6 +338,14 @@ func (b *BS) patchCore(ctx context.Context, res *reservation, claimed []byte, re
 		return 0, false, problemf(http.StatusUnprocessableEntity, "hash-mismatch",
 			"object does not verify against %s — re-push from 0 (§8.5, D-27)", res.urn)
 	}
+	// Windows cannot rename a file that holds an open handle (POSIX
+	// renames open files routinely): release ours before the promote.
+	// The bytes are already durable — f.Sync() ran at the checkpoint
+	// above — so the early close loses nothing; the handler's
+	// deferred Close becomes a harmless double-close.
+	if err := f.Close(); err != nil {
+		return newOffset, false, problemf(http.StatusInternalServerError, "hash-mismatch", "close: %v", err)
+	}
 	if prob := b.finalize(ctx, res, b.now()); prob != nil {
 		return newOffset, false, prob
 	}
@@ -398,6 +406,10 @@ func (b *BS) openCheckpoint(res *reservation, rsc *resource) (*os.File, *blake3.
 // partial is discarded; the unexpired Reservation survives at offset
 // 0 for a clean re-push.
 func (b *BS) resetToZero(ctx context.Context, res *reservation, rsc *resource) {
+	// Both call sites Truncate(0) the open partial first, so this
+	// Remove is tidiness, not correctness: on Windows it fails while
+	// the handle is open (error discarded) and the empty file is
+	// simply reused by the next attempt's O_CREATE|O_RDWR open.
 	os.Remove(b.quarantinePath(res.tokenHash))
 	rsc.hasher = nil
 	res.offset = 0
@@ -413,7 +425,16 @@ func (b *BS) finalize(ctx context.Context, res *reservation, now time.Time) *Pro
 		return problemf(http.StatusInternalServerError, "hash-mismatch", "objects: %v", err)
 	}
 	if err := os.Rename(b.quarantinePath(res.tokenHash), obj); err != nil {
-		return problemf(http.StatusInternalServerError, "hash-mismatch", "promote: %v", err)
+		// Content-addressed idempotency: if the object already sits
+		// at its address (a racing push of the same URN finished
+		// first), the rename's work is done. POSIX replace-renames
+		// atomically; Windows refuses — but both sources verified
+		// against the URN's BLAKE3, so the bytes are identical by
+		// construction and the loser's partial can simply go.
+		if _, statErr := os.Stat(obj); statErr != nil {
+			return problemf(http.StatusInternalServerError, "hash-mismatch", "promote: %v", err)
+		}
+		os.Remove(b.quarantinePath(res.tokenHash))
 	}
 	nowS := now.Format(time.RFC3339)
 	tx, err := b.DB.BeginTx(ctx, nil)
