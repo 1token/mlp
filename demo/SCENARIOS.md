@@ -1,6 +1,6 @@
 # The scenario suite — programmatic demos over real TCP sockets
 
-Thirteen self-contained stories in the `TestTwoDomainDemo` mold: each
+Fourteen self-contained stories in the `TestTwoDomainDemo` mold: each
 boots real `mlpd` nodes on real sockets (the same `buildNode`
 production composition, demo-mode peering only), walks one scenario
 through the actual client API and federation endpoints, and asserts
@@ -99,6 +99,28 @@ Seven phases, each an assertion set:
    already in the chain (D-51). Every member holds exactly one copy.
 
 Anchors: §3.4.2, §9.3, D-04, D-51, D-110, D-163, D-165.
+
+## Search finds the shoot (`scenarios_search_test.go`)
+
+`TestScenarioSearchFindsTheShoot` is the S4.19 story (D-261): Petra
+delivers a shoot whose PDF contact sheet carries a word that appears
+nowhere in the envelope — and Milan finds the message by that word.
+
+1. **Documents are just a media type** — the PDF travels as ordinary
+   §8 heavy media (below the D-139 auto-grant line, so no accept
+   ceremony); nothing on the wire knows a text extractor exists.
+2. **The index is node-local derived data** — Milan's node extracts
+   at the `OnVerified` moment (custody verified, §8.4); search is a
+   client-API surface only, and no query ever crosses the wire
+   (envelope privacy, D-04).
+3. **The sender self-heals** — Petra's upload verified before her
+   send created its promise rows, so her node indexed nothing then;
+   her first search sweeps the gap (`SyncObjects`) and finds her own
+   sent shoot through the same media door.
+4. **Diacritics fold at both ends** — `nahlady` finds `náhľady`
+   (FTS4 unicode61), and a miss is an honest empty page.
+
+Anchors: §8.4, §11.6, D-04, D-139, D-261.
 
 ## What the suite has already earned
 

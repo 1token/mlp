@@ -1,13 +1,15 @@
 # Data model — the reference schema, by subsystem
 
-Generated from `server/store/migrations/` (0001–0005) by
+Generated from `server/store/migrations/` (0001–0006) by
 `docs/architecture/gen-er.py`; regenerate after any migration. The
 §10.3 reference state machine on `refs` is enforced by a database
 trigger (see 0001), so illegal transitions fail at the storage
 layer, not by convention. Sensitive columns (`seed`, `token_hash`,
 `pin_hash`, `session_hash`) hold seeds or hashes exactly as the
 decisions demand — a database leak must not mint working
-capabilities (D-155).
+capabilities (D-155). The search index itself (`search_fts`, an FTS4
+virtual table from 0006) is not an entity: it is rebuildable derived
+data over `medialets.derived_text` and `object_text` (D-261).
 
 ## Federation core (dispatch, verdicts, delegation, discovery)
 
@@ -297,6 +299,23 @@ entity reservations_out {
 }
 objects }o--|| stores : store_id
 reservations_in }o--|| stores : store_id
+@enduml
+```
+
+## Search (node-local derived, S4.19)
+
+```plantuml
+@startuml er-search-node-local-derived-s
+!theme plain
+hide circle
+skinparam linetype ortho
+
+entity object_text {
+  *per : URN
+  extractor : TEXT
+  text : TEXT
+  extracted_at : TEXT
+}
 @enduml
 ```
 

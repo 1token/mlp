@@ -21,6 +21,8 @@ GROUPS = {
          'undo_journal', 'settings', 'events', 'idempotency'],
     'Transfer & storage':
         ['stores', 'objects', 'reservations_in', 'reservations_out'],
+    'Search (node-local derived, S4.19)':
+        ['object_text'],
     'Deliveries & guests':
         ['deliveries', 'timeline_events', 'guest_links', 'guest_downloads'],
     'Identity & sessions':
@@ -80,14 +82,16 @@ def main():
     with open(OUT, 'w') as out:
         out.write("""# Data model — the reference schema, by subsystem
 
-Generated from `server/store/migrations/` (0001–0005) by
+Generated from `server/store/migrations/` (0001–0006) by
 `docs/architecture/gen-er.py`; regenerate after any migration. The
 §10.3 reference state machine on `refs` is enforced by a database
 trigger (see 0001), so illegal transitions fail at the storage
 layer, not by convention. Sensitive columns (`seed`, `token_hash`,
 `pin_hash`, `session_hash`) hold seeds or hashes exactly as the
 decisions demand — a database leak must not mint working
-capabilities (D-155).
+capabilities (D-155). The search index itself (`search_fts`, an FTS4
+virtual table from 0006) is not an entity: it is rebuildable derived
+data over `medialets.derived_text` and `object_text` (D-261).
 
 """)
         for title, names in GROUPS.items():

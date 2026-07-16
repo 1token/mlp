@@ -1,7 +1,7 @@
 openapi: "3.0.3"
 info:
   title: MLP Client API
-  version: "0.1-draft-01"
+  version: "0.1-draft-02"
   description: >
     The mailbox-owner and guest surface of an MLP domain, as served
     by the reference implementation (mlpd) under /api/v1. Wire
@@ -32,6 +32,8 @@ tags:
     description: Sessionless, capability-token-gated (D-151–D-155).
   - name: webauthn
   - name: system
+  - name: search
+    description: Node-local full-text search (S4.19, D-261); the index is derived data and never crosses the wire.
 
 paths:
   /auth/password:
@@ -401,6 +403,43 @@ paths:
       summary: Server-sent events stream (thread and media change notifications).
       responses:
         "200": { description: SSE stream., content: { text/event-stream: { schema: { type: string } } } }
+  /search:
+    get:
+      tags: [search]
+      summary: Full-text search over this mailbox's messages — subjects, body derived text, media names, and text extracted from held media.
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, maxLength: 256 }, description: "User query; sanitized into FTS terms (implicit AND, trailing * = prefix)." }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Grouped matches, newest first; snippets mark hits with square brackets.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  query: { type: string }
+                  match: { type: string, description: The sanitized FTS expression actually run. }
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        message_id: { type: integer, format: int64 }
+                        thread_id: { type: integer, format: int64 }
+                        medialet_ca: { type: string }
+                        received_at: { type: string, format: date-time }
+                        subject: { type: string }
+                        matches:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              via: { type: string, enum: [message, media] }
+                              name: { type: string, description: Media name (via=media only). }
+                              snippet: { type: string }
+        "400": { description: Malformed q/limit/offset., content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /quota:
     get:
       tags: [system]

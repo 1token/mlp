@@ -24,6 +24,7 @@ import (
 
 	"github.com/zeebo/blake3"
 	"medialet.org/mlp/bs"
+	"medialet.org/mlp/search"
 	"medialet.org/mlp/sn"
 )
 
@@ -44,6 +45,10 @@ type Server struct {
 	// /verdict endpoint (§7.6). The default discovers the sn URL
 	// (§5); tests override.
 	PostVerdict func(ctx context.Context, origin string, doc []byte) error
+	// Search maintains the S4.19 full-text index (D-261); nil
+	// still serves /search over medialet text via a DB-only indexer.
+	Search *search.Indexer
+
 	// PasswordIterations tunes the PBKDF2 cost; 0 means the
 	// production default. Tests lower it.
 	PasswordIterations int
@@ -191,6 +196,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/deliveries/{id}", s.handler(s.handleDelivery))
 	mux.HandleFunc("GET /api/v1/deliveries/{id}/timeline", s.handler(s.handleTimeline))
 	mux.HandleFunc("GET /api/v1/quota", s.handler(s.handleQuota))
+	mux.HandleFunc("GET /api/v1/search", s.handler(s.handleSearch))
 	mux.HandleFunc("GET /api/v1/settings", s.handler(s.handleSettingsGet))
 	mux.HandleFunc("PATCH /api/v1/settings", s.handler(s.handleSettingsPatch))
 	s.registerThreadRoutes(mux)

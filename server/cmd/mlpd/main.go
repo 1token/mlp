@@ -36,6 +36,7 @@ import (
 	"medialet.org/mlp/clientapi"
 	"medialet.org/mlp/core"
 	"medialet.org/mlp/discovery"
+	"medialet.org/mlp/search"
 	"medialet.org/mlp/sn"
 	"medialet.org/mlp/store"
 )
@@ -187,14 +188,23 @@ func buildNode(cfg config) (*node, error) {
 	}
 	blob := &bs.BS{DB: db, Root: filepath.Join(dataDir, "objects"),
 		PublicBase: selfBase, Resolver: resolver, Now: clock}
+	indexer := &search.Indexer{DB: db, Now: clock,
+		Open: func(urn string) (io.ReadCloser, error) { return os.Open(blob.ObjectPath(urn)) }}
 	blob.OnVerified = func(urn string) {
 		db.Exec(`UPDATE refs SET state='available', updated_at=? WHERE urn=? AND state='expected'`,
 			time.Now().UTC().Format(time.RFC3339), urn)
+		// S4.19 (D-261): extract text the moment custody verifies —
+		// synchronous in the prototype (extraction is capped and the
+		// index is self-healing; a production node would background it).
+		if err := indexer.IndexObject(context.Background(), urn); err != nil {
+			log.Printf("mlpd: search index %s: %v", urn, err)
+		}
 	}
 	hub := clientapi.NewHub(db)
 	api := &clientapi.Server{
 		DB: db, SN: node0, BS: blob, Hub: hub, WebAuthnOrigin: origin,
-		Now: clock,
+		Search: indexer,
+		Now:    clock,
 		PostVerdict: func(ctx context.Context, target string, doc []byte) error {
 			url, err := endpoint("/verdict")(ctx, target)
 			if err != nil {

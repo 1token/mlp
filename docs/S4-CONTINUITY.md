@@ -2,7 +2,7 @@
 
 > Purpose: resume implementation in a fresh working session with zero
 > context loss. Read this first; everything else is referenced from it.
-> Updated at the S4.18 close (2026-07-15) — Windows portability of the store.
+> Updated at the S4.19 close (2026-07-16) — node-local search; MEP-003/MEP-004 filed as Drafts.
 
 ## 1. Project in one paragraph
 
@@ -57,6 +57,7 @@ sequential D-number; changes to frozen artifacts travel only as MEPs.
 | S4.16 | The scenario suite (editor-requested, TestTwoDomainDemo mold): `cmd/mlpd/scenario_harness_test.go` (N-domain `world` on one controllable clock — `config.Clock` wired through SN, BS, Client API AND the pusher), `scenarios_basic_test.go` (6: same-domain instant accept, conversation lifecycle, attach-by-reference, tier lifecycle, multi-recipient fan-out with the D-04 envelope-privacy proof on the origin's dispatch records, idempotent send), `scenarios_advanced_test.go` (6: delegated forwarding across three domains, **custody surviving the origin's death** with the MEP-001 window honored from a killed socket, D-51 loop prevention at the chain-member origin, resend-after-deletion honesty, guest lock + expiry under the moving clock, ephemeral GC vs. the pinned master); `demo/SCENARIOS.md` catalog | **all 12 scenarios green over real TCP sockets, deterministic across 3 consecutive full runs**; the suite surfaced and root-caused the §7.6 frozen-clock supersession tie (world-owned time: +1 s per protocol operation) and the unwired pusher clock |
 | S4.17 | The working-group exploder (editor-requested): `cmd/mlpd/scenarios_wg_test.go` — an IETF-style WG mailing list as an APPLICATION on MLP primitives (roster app-level, like mailman on SMTP; every action pure protocol), five domains: the list/moderator, three members, a cross-subscribed archive mirror. Seven phases: post → fan-out (per-domain Forward, D-04 preserved; authorship + CA byte-identical at every subscriber) → **heavy media never touches the list** (§9.3 delegation, the 5 MiB draft point-to-point from the author, `objectLive(lists)==false` asserted) → threading across the exploder (D-110: the reply joins the same topic everywhere because the CA is the identity) → moderation as the tier system (blocked troll `quarantined`, never inboxed, never exploded; release = approval) → the cross-subscription loop dying at one revolution (the boomerang provably arrives — two Delivery Records — and the automatic re-explosion refuses with `ErrForwardLoop`, D-51); every member exactly one copy | the scenario passes over real sockets, deterministic across 3 consecutive full-suite runs; the exploder posture is `automatic=true` — an exploder IS automation, and that honesty is what lets D-51 protect the federation |
 | S4.18 | Windows portability fix, editor-reported from a real Windows run: every upload's FINAL chunk answered 500 because `finalize` renamed the quarantine file while the handler still held its handle — routine on POSIX, a sharing violation on Windows. Fix in `bs.go`: close-before-promote (the bytes are already durable — the §8.4 checkpoint `Sync()` precedes it; the deferred Close double-closes harmlessly); the promote is now idempotent when the destination already exists (racing pushes of one URN: both verified against the URN's BLAKE3, identical by construction, the loser's partial is removed); `resetToZero`'s open-handle `os.Remove` documented as tidiness-not-correctness (both call sites `Truncate(0)` first). Audit of all five rename/remove sites: the other three are handle-free | full Linux suite green (9 pkgs; demo + 13 scenarios ×2); `CGO_ENABLED=0 GOOS=windows go build` of bs/sn/clientapi/core passes; the Windows test run itself is the editor's verification |
+| S4.19 | Node-local search (D-261): the tenth package `search/` — pluggable stdlib-only `Extractor` registry (DOCX/XLSX via zip+xml; minimal in-house PDF: Flate + Tj/TJ, kerning-gap word boundaries, printability filter dropping undecodable subset-font runs; plain text; 32 MiB in / 512 KiB out, D-264/D-267), `Indexer` with the per-URN `object_text` cache + FTS4 `search_fts` (unicode61 remove_diacritics — 'zilina' finds 'Žilina'; FTS4 because the pinned mattn build ships it tag-free where FTS5 needs a build tag, D-263); migration 0006; extraction at the `OnVerified` moment in `buildNode` + query-time `SyncMedialets`/`SyncObjects` self-heal (covers the sender-side gap: uploads verify before the send creates its promise rows) + `Reindex` (D-266); `GET /api/v1/search` — mailbox-scoped through the refs/messages joins, grouped per message with `via: message\|media`, bracket snippets, newest-first, paging, hostile queries sanitized to bare lowercased terms (D-265/D-267); OpenAPI 0.1-draft-02 + Client API draft-02 (one additive section, D-268); ER group + regeneration; the fourteenth scenario `TestScenarioSearchFindsTheShoot` | Milan finds the shoot by a word that exists ONLY inside the delivered PDF; 'nahlady' finds 'náhľady'; Petra's own sent copy self-heals into her index at first query; a miss is an honest empty page; **10 packages green**, three client gates + tsc (CI-pinned 5.5), MUST audit + all 7 vectors byte-identical, OpenAPI valid, ER regenerates byte-identically |
 | S4.14 | Conformance hardening + operations + funding: the D-104 audit as a two-script instrument (`audit-musts.py` extracts the 69-line MUST corpus, `audit-annotate.py` refuses unannotated entries and emits `MUST-AUDIT.md`; CI regenerates both and fails on drift, so a spec edit forces an audit decision) — **50 of 64 testable requirements COVERED**, 2 partial, 7 open-client + 5 open-deferred, each gap decision-tied; new failing-input tests (`sn/must_test.go`: JSON-dialect refusals incl. floats/nulls/epoch/duplicate urns, unknown-member tolerance as a positive case, the §4.1 grammar battery, §9.2 interloper-source never contacted); a genuine grammar gap found and fixed at the root (`validRun` admitted `_` in domain labels against IDNA2008 LDH — underscore now rides `extra` for local atoms only, plus label hyphen-position rules); the D-139 GC-first class on `refs.ephemeral` (0001 had the column; auto-granted refs now carry it) with `SN.CollectGarbage` honoring the §10.5 invariants (pinned retains absolutely; atomic tombstone flip; only-unavailable immediately collectable; standard class untouched) wired hourly into mlpd; `docs/OPERATOR.md` (D-180) and `docs/NLNET-APPLICATION.md` (D-42, D1–D5 each mapped to committed artifacts, €38k shaped against the audit's own open items) | **the audit is the deliverable that makes every other claim checkable**: TestGCInvariants passes first run; TestNonChainSourceNeverContacted proves the §9.2 filter; the grammar battery caught a real hole; nine packages + three client gates + seven vectors + the audit reconcile green |
 | S4.13 | The two-domain demo (Stage 3 Closing §5) + the composer's file door: `cmd/mlpd` (one binary per domain — SN + BS + Client API + static client + guest page + push loop; demo mode via `-peer` through `discovery.NewDemoFetcher`, loudly logged); `TestTwoDomainDemo` walks every §5 bullet over real TCP sockets; D-139 auto-grant implemented as the `sn.AutoGrant` recipient-policy knob (spec default stays defer-all — TV-002 reproduces); Send now writes the correspondents ledger (`first_outbound_at`), unlocking §7.5 `have` disclosure; vendored pure-JS blake3 (`@noble/hashes`, no wasm, CSP intact) + `lib/mlet-urn.js` gated on the TV-001 media address (run-urn.js in CI); the composer's hash-first file door with tus resume; `demo/run.sh` + `demo/DEMO.md` (the on-camera script) | **all seven definition-of-done bullets pass programmatically**: strangers' preview auto-grants and renders alive while the master defers; the push killed after one 2 MiB chunk sits at `pushing`/2097152 and resumes to a byte-verified object; the correspondent's resend answers `have` and accepts instantly; the reply threads and sweeps; the guest claims and instantly has; three genuine gaps surfaced and fixed at the root (auto-grant unimplemented, correspondents never written, StripPrefix breaking @target-uri) |
 | S4.12 | Guest + claim (S3.6) and passkeys (S3.8/D-233): migration 0005 (pin_failures + WebAuthn tables over the 0001-provisioned guest_links/guest_downloads); guest links minted at Send for explicitly named guests (hash-stored tokens, per-draft 6-digit PINs for the sender's second channel, the D-153 notifier hook carrying the link only, 30-day expiry); sessionless guest endpoints with the D-155 five-failure lock; payload = the render form (one viewer, two hosts — views never recorded, downloads recorded per D-147); the claim (D-154): mailbox minted, the original SM re-dispatched through the REAL local ingest (self-domain verificationKey path via own_keys), session issued, link surviving, one claim per link; instant-have as the possession short-circuit heading handleAccept (offered→expected→available in one action — claims, same-domain sends, D-26 dedup alike); `webauthn/` dependency-free (strict fixed-shape CBOR, fmt "none", ES256 + Ed25519, single-use 5-min challenges, sign-count regressions logged); register/login endpoints; client guest.html + mlp-guest.js (second viewer host, PIN prompt, blob downloads, claim + navigator.credentials) | **the guest journey passes end to end** — PIN gate, lock, un-tracked views, tracked downloads, claim → thread in the new inbox → `{state:"available", instant:true}` with no bytes moving, the link surviving its claim, expiry at day 31; the passkey ceremonies pass with synthetic authenticators (challenge reuse and tampered assertions refuse); found and fixed the drafts dialect break (untagged ManifestEntry marshaled CamelCase against D-170 — now snake_case at the root) |
@@ -463,7 +464,54 @@ already-present destination as success (identical bytes by
 construction: both sources verified against the URN's BLAKE3).
 `ObjectPath` already strips `urn:mlet:` so no reserved characters
 reach the filesystem; future file-touching code inherits this
-posture.
+posture. · **D-258** versioning policy: the 0.1 line is the
+only line — additive capabilities land via MEPs and consolidate into
+numbered drafts; 1.0 is declared at post-funding stabilization; "v2"
+is reserved for wire-incompatible changes and does not exist today.
+· **D-259** MEP-003 (bao verified streaming) is core-spec territory:
+an optional negotiated capability — the BLAKE3 root every
+`urn:mlet:` already carries commits to the whole Merkle tree, so
+verified streaming and verified range slices need ZERO identifier
+changes; outboard trees are private derived data (never in a
+Manifest); the §8.4 checkpoint stays REQUIRED; acceptance triggers
+core draft-03 + TV-008. · **D-260** MEP-004 (mailing-list profile)
+is a companion document, not core text: the `spec/profiles/` series
+(independently versioned, normative for claimants only), S4.17 as
+the reference implementation, at most a one-line §14 registry
+reservation ever touching core — email's shape (5321/5322 core,
+2919/2369 layered), copied deliberately. · **D-261** search is
+implementation, not protocol: local per-mailbox FTS over derived
+text + extracted media text; documents are just a media type; one
+additive Client API endpoint; cross-domain search explicitly out of
+scope (D-04 envelope privacy). · **D-262** sequencing: search
+implemented first (S4.19), MEP-003/004 filed as Drafts in the same
+session; draft-03 is cut only on MEP-003 acceptance. · **D-263**
+FTS4, not FTS5: the pinned mattn/go-sqlite3 default build ships FTS4
+tag-free where FTS5 needs `sqlite_fts5`; build/test commands stay
+tag-free on both OSes; unicode61 `remove_diacritics=1`; FTS5 remains
+a one-migration swap. · **D-264** extraction is stdlib-only with
+documented limits: OOXML via zip+xml; PDF minimal in-house (Flate,
+Tj/TJ, kerning-gap spaces, printability filter; no ToUnicode, no
+encryption); pluggable `Extractor` interface for production parsers;
+the dependency posture (and the NLnet supply-chain story) stays
+clean. · **D-265** index architecture: `object_text` is a per-URN
+cache shared across mailboxes (content-addressed: extract once) —
+safe because results scope through the refs/messages joins at query
+time; `search_fts` is node-global with kind/key unindexed; the
+DECLARED Manifest type chooses the extractor — bytes are never
+sniffed to pick a parser. · **D-266** self-healing triggers:
+synchronous extraction at `OnVerified` (prototype-honest; production
+backgrounds it); `SyncMedialets` + `SyncObjects` before every query
+(covers the sender-side gap and restores); unreferenced objects are
+not negative-cached; `Reindex` rebuilds everything. · **D-267** caps
+and query shape: 32 MiB read / 512 KiB text per object; queries
+sanitized to lowercased bare terms (FTS operators neutralized),
+implicit AND, trailing `*` = prefix; newest-first (mailbox search is
+chronological, like the inbox); 400-row bound grouped in Go;
+bracket-marked snippets. · **D-268** S4.19 scope: server + API +
+scenario; the client search UI is S4.20; OpenAPI bumped to
+0.1-draft-02 alongside Client API draft-02 (additive; draft-01
+clients unaffected).
 
 ## 4. Environment recipe (sandbox)
 
@@ -503,7 +551,7 @@ conformance hardening + operator guide + NLnet.
 
 Per session: design/implementation presented with lettered judgment
 calls → Igor confirms explicitly → decisions frozen with sequential
-D-numbers (next free: **D-258**) → artifacts delivered as local
+D-numbers (next free: **D-269**) → artifacts delivered as local
 commits emitted as a `git format-patch` series against `origin/main`
 for Igor's review, `git am`, and push (D-196) → next-session pointer. Honesty rules: caught problems are
 surfaced, never patched silently; spec gaps go to the MEP queue;
