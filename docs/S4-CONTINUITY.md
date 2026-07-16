@@ -511,7 +511,13 @@ chronological, like the inbox); 400-row bound grouped in Go;
 bracket-marked snippets. · **D-268** S4.19 scope: server + API +
 scenario; the client search UI is S4.20; OpenAPI bumped to
 0.1-draft-02 alongside Client API draft-02 (additive; draft-01
-clients unaffected).
+clients unaffected). · **D-269** MEP-003 filed as Draft with:
+the `bao-stream/1` capability token, combined slice encoding, 16 KiB
+chunk groups (benchmark-confirmed before acceptance, then frozen in
+the spec — never negotiated), the `bao-verify-failed` problem token,
+the TV-008 requirement, and the noted dependency implication (the
+reference server's `zeebo/blake3` lacks bao encode/decode;
+`lukechampine.com/blake3` has it).
 
 ## 4. Environment recipe (sandbox)
 
@@ -551,7 +557,7 @@ conformance hardening + operator guide + NLnet.
 
 Per session: design/implementation presented with lettered judgment
 calls → Igor confirms explicitly → decisions frozen with sequential
-D-numbers (next free: **D-269**) → artifacts delivered as local
+D-numbers (next free: **D-270**) → artifacts delivered as local
 commits emitted as a `git format-patch` series against `origin/main`
 for Igor's review, `git am`, and push (D-196) → next-session pointer. Honesty rules: caught problems are
 surfaced, never patched silently; spec gaps go to the MEP queue;
@@ -565,3 +571,5 @@ conformance claims are machine-verified.
 3. ~~Publish the repository~~ — done: github.com/1token/mlp is live
    and is the continuation carrier (cloned directly in S4.3; D-40,
    D-196).
+4. Decide MEP-003 (bao verified streaming, D-269) — filed 2026-07-16
+   as Draft; acceptance cuts core draft-03 + TV-008.
