@@ -517,7 +517,18 @@ chunk groups (benchmark-confirmed before acceptance, then frozen in
 the spec — never negotiated), the `bao-verify-failed` problem token,
 the TV-008 requirement, and the noted dependency implication (the
 reference server's `zeebo/blake3` lacks bao encode/decode;
-`lukechampine.com/blake3` has it).
+`lukechampine.com/blake3` has it). · **D-270** MEP-004 filed as
+Draft: establishes `spec/profiles/` (independently versioned,
+normative for claimants only, a profile MUST NOT bind
+non-participants) and the mailing-list profile's content list — list
+identity + the `list` metadata member, subscribe/unsubscribe as
+plain Medialets to the list address, re-dispatch always §3.4.2 with
+`automatic=true` preserving the author signature, D-51 refusal
+terminal (never retried), tier moderation visible to the sender and
+never a silent drop, heavy media delegated per §9.3 (the list SHOULD
+NOT take custody); the profile document itself is written on
+acceptance with `TestScenarioWorkingGroupExploder` as its reference
+implementation.
 
 ## 4. Environment recipe (sandbox)
 
@@ -557,7 +568,7 @@ conformance hardening + operator guide + NLnet.
 
 Per session: design/implementation presented with lettered judgment
 calls → Igor confirms explicitly → decisions frozen with sequential
-D-numbers (next free: **D-270**) → artifacts delivered as local
+D-numbers (next free: **D-271**) → artifacts delivered as local
 commits emitted as a `git format-patch` series against `origin/main`
 for Igor's review, `git am`, and push (D-196) → next-session pointer. Honesty rules: caught problems are
 surfaced, never patched silently; spec gaps go to the MEP queue;
@@ -571,5 +582,7 @@ conformance claims are machine-verified.
 3. ~~Publish the repository~~ — done: github.com/1token/mlp is live
    and is the continuation carrier (cloned directly in S4.3; D-40,
    D-196).
-4. Decide MEP-003 (bao verified streaming, D-269) — filed 2026-07-16
-   as Draft; acceptance cuts core draft-03 + TV-008.
+4. Decide MEP-003 (bao verified streaming, D-269) and MEP-004 (the
+   mailing-list profile, D-270) — both filed 2026-07-16 as Drafts;
+   MEP-003 acceptance cuts core draft-03 + TV-008; MEP-004
+   acceptance produces `spec/profiles/mailing-list-draft-01.md`.
