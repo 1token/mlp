@@ -2,15 +2,24 @@
 
 | | |
 |---|---|
-| **Version** | MLP/0.1 — document revision draft-02 (draft-01 + MEP-001, MEP-002) |
+| **Version** | MLP/0.1 — document revision draft-03 (draft-02 + MEP-003, MEP-004) |
 | **Status** | Pre-1.0, declared unstable (D-101); all changes via MEP (D-40) |
 | **Editor** | Igor (sole editor through 1.0, per D-40) |
-| **Date** | 2026-07-12 |
+| **Date** | 2026-07-17 |
 | **License** | CC-BY 4.0 (D-39) |
-| **Conformance** | Test vectors TV-001–TV-007 with committed generators (Annex C) |
+| **Conformance** | Test vectors TV-001–TV-008 with committed generators (Annex C) |
 | **Decision register** | Stage 1 Closing Document (D-01–D-42); Stage 2 Closing Document (D-43 onward) |
 
-> **Changelog.** draft-02 (2026-07-12): MEP-001 (fulfillment-window
+> **Changelog.** draft-03 (2026-07-17): MEP-003 (bao verified
+> streaming — §5.2 `capabilities` with the `bao-stream/1` token, §8.9
+> verified-streaming push, Annex D encoding, `bao-verify-failed`,
+> TV-008; integrated with the fetch-surface correction recorded in the
+> MEP's editor decision: MLP has no cross-domain read — D-11 pure push
+> — so slice consumption binds deployment read surfaces, informative
+> per D-68/D-79) and MEP-004 (the mailing-list profile — §3.4.1 `list`
+> member; the profile itself lives at `spec/profiles/`, normative for
+> claimants only) accepted and applied.
+> draft-02 (2026-07-12): MEP-001 (fulfillment-window
 > override — §3.4.1 `until`, §10.3 effective offer deadline, §9.5
 > declarant binding) and MEP-002 (`preview_of` Manifest member —
 > §3.2.2) accepted and applied; conformance grows TV-006 and TV-007.
@@ -35,6 +44,7 @@
 - Annex A (informative): Guest Delivery
 - Annex B (informative): Deployment Topologies
 - Annex C (informative): Conformance Overview
+- Annex D (normative): The application/mlp-bao Encoding
 
 ## 1. Introduction
 
@@ -387,6 +397,7 @@ to clients (D-03).
 | `origin` | string | REQUIRED | The dispatching SN's domain (A-label form for IDN domains). The Hop Signature verifies against this domain's `sn`-role keys. |
 | `envelope_to` | array of string | REQUIRED | Non-empty array of bare Addresses (no display names — routing data only). All entries MUST share a single domain: the target domain. Maximum **128** entries (D-52). Bcc semantics: one Envelope per Bcc recipient, naming only that recipient, even when several Bcc recipients share a domain (D-03). |
 | `forwarded_by` | string | OPTIONAL | The Address of the mailbox whose action caused this dispatch, when the dispatch results from a forward. Supplies the "received via B" delivery metadata of D-04. A forwarding SN MAY omit it for forwarder privacy. Absent on original dispatches. (D-50) |
+| `list` | string | OPTIONAL | An Address: the mailing list on whose behalf this dispatch was exploded. Set by re-dispatching exploders claiming the mailing-list profile (`spec/profiles/`, MEP-004); the profile binds its claimants — for core receivers the member is informational delivery metadata (display "via the list", threading hints). Hop-signed like every Envelope member: the dispatch is the list's own act. |
 | `fulfillment_sources` | array of object | OPTIONAL | Each `{ "domain": <string, REQUIRED>, "urns": <array of string, OPTIONAL — absent means all Manifest URNs>, "until": <string, OPTIONAL, RFC 3339 UTC — MEP-001> }`, in preference order (nearest hop first, D-24). `until` is the declaring source's own offer window for the URNs this entry covers: its promise that it will honor grants (as enveloping origin, §7.6) or delegation requests (§9.4) for those objects until the stated time. Absent means the single source `origin` — the direct-dispatch case. An SN dispatching a delegated forward MUST list at least the custody-holding sources it knows, the root origin at minimum (D-22–D-24). |
 | `hops` | array of Hop Attestation | OPTIONAL | The signature chain, oldest first (§3.4.2). Absent on original dispatches. Maximum **32** entries (D-51). |
 | `medialet` | object | REQUIRED | The Signed Medialet (§3.3), unchanged. |
@@ -721,6 +732,7 @@ cap: **65,536 bytes** (D-57, aligned with the hardened-profile response cap).
 | `sn` | string | REQUIRED | The domain's SN endpoint: an `https` URL (any port; path allowed). The SN HTTP API is rooted here (Section 7). |
 | `keys` | array of Key Entry | REQUIRED | The domain's key set; at most **64** entries. |
 | `contact` | string | OPTIONAL | Operational contact: an Address or an `https`/`mailto` URL. (D-56) |
+| `capabilities` | array of string | OPTIONAL | Optional-capability tokens this domain's endpoints support, from the §14 capability registry (initial token: `bao-stream/1`, MEP-003). Unknown tokens MUST be ignored. Absence of the member, or of a token, means the capability is not offered — capabilities are strictly additive and their absence never degrades draft-02 behavior. |
 
 A **Key Entry**:
 
@@ -1525,6 +1537,37 @@ shapes against known keys; the checkpoint/rollback invariant
 (digest-mismatch truncation); offset realignment after lost replies;
 completion verification and token consumption; `hash-mismatch` reset; the
 distinction table of §8.5 exercised failure by failure.*
+
+### 8.9 Verified-streaming push: mlp-bao (MEP-003)
+
+The URN's BLAKE3 root already commits to the object's entire Merkle
+tree; the plain §8.4 pipeline uses that commitment only at completion.
+When the **receiving** domain advertises the `bao-stream/1` capability
+(§5.2), a pusher MAY instead send the object as its combined encoding
+(Annex D): `Content-Type: application/mlp-bao`, with `Upload-Length`,
+`Upload-Offset`, and the checkpoint/rollback machinery of §8.4 all
+measured in **encoded-stream bytes** (the encoded length is a
+deterministic function of the content length; Annex D). A pusher MUST
+NOT send `application/mlp-bao` to a resource whose receiving domain
+does not advertise `bao-stream/1`; such a request fails 415.
+
+The receiving BS verifies incrementally: each parent node and each
+chunk group is checked against its expected chaining value the moment
+it is complete (Annex D), and the final group's verification **is** the
+§8.4 URN comparison — there is no separate completion hash. The BS
+MUST reject a non-verifying node or group with 422 `bao-verify-failed`
+and reset the resource to offset 0: like `hash-mismatch`, this is the
+*object* failing its URN — the source is wrong — merely detected at
+the first bad 16 KiB instead of after the full transfer. The
+`digest-mismatch` taxon (§8.4, this request corrupted in transit)
+applies unchanged and remains retryable at the same offset.
+
+Everything else is untouched: the Reservation, the token, headers,
+segments, resumption (§8.7 checkpoints hold encoded offsets), and the
+completion effects (live, `have`-answerable, token consumed). A
+delegated fulfillment push (§9.4) uses this section under the same
+rule — the requester whose BS ingests is the party whose capability
+advertisement governs.
 
 ## 9. Forwarding and Delegation
 
@@ -2428,8 +2471,11 @@ semantics is a new version of that label, never a mutation.
 | Transport/validation | `malformed` `envelope-too-large` `version-unsupported` `signature-invalid` `timestamp-skew` `replay` `rate-limited` `discovery-failed` `unknown-envelope` `invalid-transition` |
 | Recipient-level | `unknown-recipient` `mailbox-disabled` `policy` `suspected-junk` |
 | Media-level | `pending-acceptance` `quota` `type-forbidden` `size-exceeds-policy` `hash-blocklist` `delegation-budget` |
-| Transfer | `offset-mismatch` `digest-mismatch` `hash-mismatch` `reservation-expired` `reservation-invalid` `stalled` |
+| Transfer | `offset-mismatch` `digest-mismatch` `hash-mismatch` `reservation-expired` `reservation-invalid` `stalled` `bao-verify-failed` |
 | Delegation | `not-available` `medialet-mismatch` |
+
+**Capability tokens** (§5.2; grammar `name "/" version`):
+`bao-stream/1` (MEP-003).
 
 **Key roles** (§5.2, §6.3): `sn`, `bs`, `author`.
 
@@ -2437,7 +2483,8 @@ semantics is a new version of that label, never a mutation.
 `quarantined`; per-URN `grant` / `have` / `defer` / `deny`.
 
 **Media types** (§7.2, §9.4): `application/mlp-envelope+json`,
-`application/mlp-verdict+json`, `application/mlp-delegation+json` —
+`application/mlp-verdict+json`, `application/mlp-delegation+json`,
+`application/mlp-bao` (§8.9, Annex D) —
 unregistered with IANA at this time; standards-tree registration is
 intended at the Independent-Submission stage (D-40), stated plainly
 rather than implied (D-100).
@@ -2620,3 +2667,66 @@ honor system.
 claim (D-39) whose objective content is: the implementation passes the
 current conformance suite for the wire versions it advertises. Nothing
 else confers or denies it.
+
+## Annex D (normative): The application/mlp-bao Encoding
+
+The encoding is the bao verified-streaming format applied to MLP's
+existing BLAKE3 identifiers, profiled to one fixed geometry. It adds
+nothing to the trust model: every chaining value it carries is already
+committed to by the `urn:mlet:` root; the encoding merely transports
+the tree so a receiver can verify incrementally.
+
+### D.1 Geometry
+
+The **chunk group** is **16,384 bytes** — 16 contiguous BLAKE3 chunks.
+Encoders MUST emit full 16,384-byte groups except the final group,
+which carries the remainder (an empty object is one empty group).
+Rationale, recorded for the pin (D-273): parent overhead is 64 bytes
+per ~16 KiB ≈ 0.4 % of the stream; the first verifiable rejection
+point is 16 KiB; and 16 KiB divides the §8.6 segment grid exactly
+(one 16 MiB segment = 1,024 groups).
+
+### D.2 Chaining values
+
+The **group CV** is the standard BLAKE3 subtree chaining value over
+the group's chunks *at their original chunk counters* — the same
+values the URN computation already produces internally. No flags
+beyond BLAKE3's own; a group CV is never root-finalized unless the
+whole object is a single group. The **parent node** is the 64-byte
+concatenation `left CV || right CV`; its own CV is the BLAKE3 parent
+compression of those bytes. Tree shape is BLAKE3's: the left subtree
+spans the largest power of two of groups strictly less than the total.
+The topmost value, root-finalized, MUST equal the URN's digest —
+that equality is the object verification.
+
+### D.3 Combined form
+
+`encoding = length || tree`, where `length` is the **content** length
+as an 8-byte little-endian unsigned integer, and `tree` serializes the
+root subtree **pre-order**: a parent serializes as its 64-byte node
+followed by its left then right subtrees; a leaf serializes as the
+group's content bytes. Encoded size is therefore
+`8 + 64·(groups − 1) + content_length`. A verifier consumes the stream
+in the same order, checking each parent node against its expected CV
+before descending and each group against its expected CV before
+accepting its bytes; verifiers MUST NOT release or act on any byte of
+a group that has not verified.
+
+### D.4 Slice form
+
+A slice for the content range `[offset, offset+len)` is the combined
+form with every subtree that does not intersect the range omitted —
+its CV is already present in its parent's node, which is retained.
+Group alignment is inherent: the slice carries whole groups. Slices
+answer ranged, seekable, verified reads. **Consumption surfaces are
+deployment territory**: MLP has no cross-domain read (transfer is
+pure push, D-11), so slices bind the client-API and guest read
+surfaces, informative per D-68/D-79/D-86; the byte format defined
+here is normative wherever the encoding is used.
+
+### D.5 Conformance
+
+TV-008 pins the encoding: a rule-generated object, its group and
+parent chaining values, the full combined form and one boundary-
+crossing slice (each pinned by BLAKE3 digest), and one corrupted
+slice with its expected `bao-verify-failed` rejection point.

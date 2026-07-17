@@ -8,7 +8,7 @@ that adds or moves a requirement fails loudly until the audit
 import re
 import sys
 
-SPEC = 'spec/MLP-Core-Specification-0.1-draft-02.md'
+SPEC = 'spec/MLP-Core-Specification-0.1-draft-03.md'
 OUT = 'conformance/must-corpus.txt'
 
 def main():
@@ -16,7 +16,7 @@ def main():
     section = ''
     rows = []
     for line in lines:
-        m = re.match(r'^#{2,4}\s+([\d.]+[^#]*)', line)
+        m = re.match(r'^#{2,4}\s+((?:[\d.]+|Annex [A-Z])[^#]*)', line)
         if m:
             section = m.group(1).strip()
         if 'MUST' in line:
