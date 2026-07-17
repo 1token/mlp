@@ -36,8 +36,8 @@ func Handler(b *BS) http.Handler {
 			w.WriteHeader(http.StatusOK)
 
 		case http.MethodPatch:
-			if r.Header.Get("Content-Type") != ctOffset {
-				w.WriteHeader(http.StatusUnsupportedMediaType) // tus semantics (§8.5)
+			if ct := r.Header.Get("Content-Type"); ct != ctOffset && ct != "application/mlp-bao" {
+				w.WriteHeader(http.StatusUnsupportedMediaType) // tus semantics (§8.5); §8.9 adds mlp-bao
 				return
 			}
 			offset, verified, prob := b.Patch(r.Context(), token, targetURI, header, r.Body)

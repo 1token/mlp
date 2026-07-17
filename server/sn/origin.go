@@ -150,12 +150,17 @@ func (s *SN) applySnapshot(ctx context.Context, pv *ParsedVerdict, isUpdate bool
 		return prob
 	}
 	if supersedes {
+		// The push queue carries the RECEIVING domain's identity so
+		// the pusher can consult its §5.2 capability advertisement.
+		var targetDomain string
+		tx.QueryRowContext(ctx,
+			`SELECT target_domain FROM dispatches WHERE envelope_id=?`, pv.EnvelopeID).Scan(&targetDomain)
 		for _, g := range grants {
 			r := g.Reservation
 			if _, err := tx.ExecContext(ctx,
-				`INSERT INTO reservations_out (urn, target_url, token, max_size, expires, envelope_id, state)
-				 VALUES (?,?,?,?,?,?,'pending')`,
-				r.URN, r.TargetURL, r.Token, r.MaxSize, r.Expires, pv.EnvelopeID); err != nil {
+				`INSERT INTO reservations_out (urn, target_url, token, max_size, expires, envelope_id, state, target_domain)
+				 VALUES (?,?,?,?,?,?,'pending',?)`,
+				r.URN, r.TargetURL, r.Token, r.MaxSize, r.Expires, pv.EnvelopeID, targetDomain); err != nil {
 				return problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
 			}
 		}

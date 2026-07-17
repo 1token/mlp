@@ -80,7 +80,12 @@ type Document struct {
 	MLP     []string
 	SN      string
 	Contact string
-	Keys    []KeyEntry // entries that passed self-verification, in published order
+	// Capabilities are the §5.2 optional-capability tokens (MEP-003,
+	// draft-03). Unknown tokens MUST be ignored by consumers — the
+	// slice carries whatever the document advertised; membership
+	// checks pick out what a consumer understands.
+	Capabilities []string
+	Keys         []KeyEntry // entries that passed self-verification, in published order
 	// Rejected counts key entries ignored under the §6.2 rule (kid
 	// self-verification failure, alg/multicodec mismatch, malformed
 	// entry, duplicate kid). The remainder of the document is still
@@ -160,7 +165,20 @@ func ParseDocument(raw []byte, queriedDomain string, supported []string) (*Docum
 		return nil, fmt.Errorf("%w: `sn` is not an https URL", ErrDocument)
 	}
 
-	doc.Contact, _ = obj["contact"].(string) // OPTIONAL (D-56)
+	doc.Contact, _ = obj["contact"].(string)          // OPTIONAL (D-56)
+	if raw, present := obj["capabilities"]; present { // OPTIONAL (MEP-003)
+		arr, ok := raw.([]any)
+		if !ok {
+			return nil, fmt.Errorf("capabilities must be an array of strings (§5.2)")
+		}
+		for _, v := range arr {
+			s, ok := v.(string)
+			if !ok {
+				return nil, fmt.Errorf("capabilities must be an array of strings (§5.2)")
+			}
+			doc.Capabilities = append(doc.Capabilities, s)
+		}
+	}
 
 	keysRaw, ok := obj["keys"].([]any)
 	if !ok {

@@ -285,6 +285,7 @@ entity reservations_in {
   hasher_state : BLOB
   store_id : INTEGER
   created : TEXT
+  encoding : TEXT
 }
 entity reservations_out {
   *id : INTEGER
@@ -296,6 +297,7 @@ entity reservations_out {
   envelope_id : TEXT
   state : TEXT
   offset_confirmed : INTEGER
+  target_domain : TEXT
 }
 objects }o--|| stores : store_id
 reservations_in }o--|| stores : store_id

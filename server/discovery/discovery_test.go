@@ -500,3 +500,39 @@ func TestResolverRejectsMalformedDomain(t *testing.T) {
 		}
 	}
 }
+
+// TestCapabilitiesParsing — M031 (§5.2, MEP-003): the OPTIONAL
+// `capabilities` member parses as an array of strings; unknown
+// tokens ride along unharmed (consumers ignore what they don't
+// understand — the array itself is not filtered); a mistyped member
+// hard-fails like any other §5.2 type error.
+func TestCapabilitiesParsing(t *testing.T) {
+	v := loadTV001(t)
+
+	raw := mutated(t, v.DomainDocument, func(doc map[string]any) {
+		doc["capabilities"] = []any{"bao-stream/1", "future-cap/9"}
+	})
+	doc, err := ParseDocument(raw, "origin.example", []string{"0.1"})
+	if err != nil {
+		t.Fatalf("capabilities must parse: %v", err)
+	}
+	if len(doc.Capabilities) != 2 || doc.Capabilities[0] != "bao-stream/1" || doc.Capabilities[1] != "future-cap/9" {
+		t.Fatalf("unknown tokens must be carried, not stripped: %v", doc.Capabilities)
+	}
+
+	// Absent member: an empty slice, no error (it is OPTIONAL).
+	doc, err = ParseDocument(fixtureBytes(t, v.DomainDocument), "origin.example", []string{"0.1"})
+	if err != nil || len(doc.Capabilities) != 0 {
+		t.Fatalf("absent capabilities: %v %v", err, doc.Capabilities)
+	}
+
+	// Mistyped members hard-fail.
+	for _, wrong := range []any{"bao-stream/1", []any{1}, map[string]any{}} {
+		raw := mutated(t, v.DomainDocument, func(doc map[string]any) {
+			doc["capabilities"] = wrong
+		})
+		if _, err := ParseDocument(raw, "origin.example", []string{"0.1"}); err == nil {
+			t.Fatalf("mistyped capabilities %#v must hard-fail (§5.2)", wrong)
+		}
+	}
+}

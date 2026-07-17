@@ -394,9 +394,9 @@ func (s *SN) ProcessFulfill(ctx context.Context, raw []byte) ([]byte, *Problem) 
 	}
 	for _, g := range accepted {
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO reservations_out (urn, target_url, token, max_size, expires, envelope_id, state)
-			 VALUES (?,?,?,?,?,?,'pending')`,
-			g.urn, g.res.TargetURL, g.res.Token, g.res.MaxSize, g.res.Expires, pd.Root.EnvelopeID); err != nil {
+			`INSERT INTO reservations_out (urn, target_url, token, max_size, expires, envelope_id, state, target_domain)
+			 VALUES (?,?,?,?,?,?,'pending',?)`,
+			g.urn, g.res.TargetURL, g.res.Token, g.res.MaxSize, g.res.Expires, pd.Root.EnvelopeID, pd.Requester); err != nil {
 			return nil, problemf(http.StatusInternalServerError, "malformed", "store: %v", err)
 		}
 	}

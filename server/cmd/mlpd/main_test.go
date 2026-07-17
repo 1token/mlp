@@ -256,6 +256,16 @@ func TestTwoDomainDemo(t *testing.T) {
 	// process "dies" — the source vanishes mid-read, Push returns
 	// without any state transition, and the row sits at 'pushing'
 	// with the receiver's confirmed offset. Exactly kill -9.
+	//
+	// S4.22: the crash push runs with capabilities dark (a truncated
+	// SOURCE under mlp-bao dies at encode time, before any byte
+	// moves — the encoded form's root node needs every group CV up
+	// front, so the mid-read death only exists on the raw path).
+	// The resume below runs with capabilities restored, which is
+	// itself an assertion: the §8.9 adoption rule keeps a raw-bound
+	// resource raw even when the pusher has since learned bao.
+	savedCaps := origin.pusher.Caps
+	origin.pusher.Caps = nil
 	origin.pusher.Chunk = 2 << 20
 	var resID int64
 	origin.DB.QueryRow(`SELECT id FROM reservations_out WHERE urn=?`, masterURN).Scan(&resID)
@@ -270,6 +280,7 @@ func TestTwoDomainDemo(t *testing.T) {
 	if offsetAfterKill != 2<<20 || stateAfterKill != "pushing" {
 		t.Fatalf("the kill must land mid-flight: offset %d state %q", offsetAfterKill, stateAfterKill)
 	}
+	origin.pusher.Caps = savedCaps        // the "restart" learns bao again
 	origin.pushOnce(context.Background()) // the restarted process resumes
 	var masterObjState string
 	target.DB.QueryRow(`SELECT state FROM objects WHERE urn=?`, masterURN).Scan(&masterObjState)

@@ -19,6 +19,9 @@ import (
 	"time"
 
 	"medialet.org/mlp/discovery"
+	"os"
+
+	"medialet.org/mlp/bao"
 )
 
 // DefaultChunk is the RECOMMENDED PATCH ceiling (§8.4, D-76).
@@ -36,6 +39,12 @@ var (
 
 // Pusher drives the §8.7 loop for reservations_out rows.
 type Pusher struct {
+	// Caps returns the receiving domain's §5.2 capability tokens
+	// (from discovery); nil or empty means push raw. The pusher MUST
+	// NOT send application/mlp-bao to a domain not advertising
+	// bao-stream/1 (§8.9) — this hook is that gate.
+	Caps func(ctx context.Context, domain string) []string
+
 	DB     *sql.DB
 	Domain string // our domain; signing key = bs-role entry in own_keys
 	Now    func() time.Time
@@ -101,11 +110,11 @@ func HardenedClient() *http.Client {
 // state/offset. It returns nil once the receiver answers
 // MLP-Object-State: verified.
 func (p *Pusher) Push(ctx context.Context, id int64, src io.ReadSeeker) error {
-	var targetURL, token, expires string
+	var targetURL, token, expires, targetDomain string
 	var size int64
 	if err := p.DB.QueryRowContext(ctx,
-		`SELECT target_url, token, max_size, expires FROM reservations_out WHERE id=?`, id).
-		Scan(&targetURL, &token, &size, &expires); err != nil {
+		`SELECT target_url, token, max_size, expires, target_domain FROM reservations_out WHERE id=?`, id).
+		Scan(&targetURL, &token, &size, &expires, &targetDomain); err != nil {
 		return fmt.Errorf("mlp/bs: reservation row: %w", err)
 	}
 	u, err := url.Parse(targetURL)
@@ -125,6 +134,20 @@ func (p *Pusher) Push(ctx context.Context, id int64, src io.ReadSeeker) error {
 	}
 	p.setState(ctx, id, "pushing", -1)
 
+	// §8.9: when the receiving domain advertises bao-stream/1, push
+	// the combined encoding — same loop, same resumption, encoded
+	// offsets. The encoded stream is materialized lazily, once, to a
+	// temp file so HEAD-realigned retries seek like raw pushes do.
+	wantBao := p.baoCapable(ctx, targetDomain)
+	rawSrc, rawSize := src, size
+	var encSrc *os.File
+	defer func() {
+		if encSrc != nil {
+			encSrc.Close()
+			os.Remove(encSrc.Name())
+		}
+	}()
+
 	attempts := p.MaxAttempts
 	if attempts <= 0 {
 		attempts = 8
@@ -135,13 +158,33 @@ func (p *Pusher) Push(ctx context.Context, id int64, src io.ReadSeeker) error {
 	}
 
 	for attempt := 0; attempt < attempts; attempt++ {
-		// Step 1–2: HEAD for the durable checkpoint.
-		offset, prob, err := p.head(ctx, targetURL, token, kid, priv)
+		// Step 1–2: HEAD for the durable checkpoint. The reported
+		// Upload-Length also reveals a partially pushed resource's
+		// bound encoding (§8.9: the first PATCH fixed it) — a
+		// resumed push MUST adopt the binding, never switch, even
+		// if the capability picture changed between process lives.
+		offset, uploadLen, prob, err := p.head(ctx, targetURL, token, kid, priv)
 		if err != nil {
 			continue // transport fault: retry the loop
 		}
 		if prob != nil {
 			return p.classify(ctx, id, prob)
+		}
+		useBao := wantBao
+		if offset > 0 {
+			useBao = uploadLen == bao.EncodedSize(rawSize) && uploadLen != rawSize
+		}
+		contentType, src, size := ctOffset, rawSrc, rawSize
+		if useBao {
+			if encSrc == nil {
+				if encSrc, size, err = p.encodeTemp(rawSrc, rawSize); err != nil {
+					// A source that cannot be read is the same
+					// process-death analogue as a mid-loop source
+					// error: return without any state transition.
+					return fmt.Errorf("mlp/bs: bao encode: %w", err)
+				}
+			}
+			src, size, contentType = encSrc, bao.EncodedSize(rawSize), "application/mlp-bao"
 		}
 		p.setState(ctx, id, "pushing", offset)
 
@@ -158,7 +201,7 @@ func (p *Pusher) Push(ctx context.Context, id int64, src io.ReadSeeker) error {
 			if _, err := io.ReadFull(src, body); err != nil {
 				return fmt.Errorf("mlp/bs: source read: %w", err)
 			}
-			newOffset, verified, prob, err := p.patch(ctx, targetURL, token, kid, priv, offset, body)
+			newOffset, verified, prob, err := p.patch(ctx, targetURL, token, kid, priv, offset, body, contentType)
 			if err != nil {
 				break // lost reply or transport death → re-HEAD (§8.7)
 			}
@@ -211,39 +254,40 @@ func (p *Pusher) setState(ctx context.Context, id int64, state string, offset in
 	p.DB.ExecContext(ctx, `UPDATE reservations_out SET state=? WHERE id=?`, state, id)
 }
 
-func (p *Pusher) head(ctx context.Context, targetURL, token, kid string, priv ed25519.PrivateKey) (int64, *Problem, error) {
+func (p *Pusher) head(ctx context.Context, targetURL, token, kid string, priv ed25519.PrivateKey) (int64, int64, *Problem, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, targetURL, nil)
 	if err != nil {
-		return 0, nil, err
+		return 0, 0, nil, err
 	}
 	req.Header.Set("Tus-Resumable", "1.0.0")
 	req.Header.Set("MLP-Reservation", token)
 	if err := p.sign(req, kid, priv, false); err != nil {
-		return 0, nil, err
+		return 0, 0, nil, err
 	}
 	resp, err := p.client().Do(req)
 	if err != nil {
-		return 0, nil, err
+		return 0, 0, nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return 0, readProblem(resp), nil
+		return 0, 0, readProblem(resp), nil
 	}
 	offset, err := strconv.ParseInt(resp.Header.Get("Upload-Offset"), 10, 64)
 	if err != nil {
-		return 0, nil, fmt.Errorf("mlp/bs: HEAD without Upload-Offset")
+		return 0, 0, nil, fmt.Errorf("mlp/bs: HEAD without Upload-Offset")
 	}
-	return offset, nil, nil
+	uploadLen, _ := strconv.ParseInt(resp.Header.Get("Upload-Length"), 10, 64)
+	return offset, uploadLen, nil, nil
 }
 
-func (p *Pusher) patch(ctx context.Context, targetURL, token, kid string, priv ed25519.PrivateKey, offset int64, body []byte) (int64, bool, *Problem, error) {
+func (p *Pusher) patch(ctx context.Context, targetURL, token, kid string, priv ed25519.PrivateKey, offset int64, body []byte, contentType string) (int64, bool, *Problem, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, targetURL, bytes.NewReader(body))
 	if err != nil {
 		return 0, false, nil, err
 	}
 	digest := sha256.Sum256(body)
 	req.Header.Set("Tus-Resumable", "1.0.0")
-	req.Header.Set("Content-Type", ctOffset)
+	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("Upload-Offset", strconv.FormatInt(offset, 10))
 	req.Header.Set("Content-Digest", "sha-256=:"+toBase64(digest[:])+":")
 	req.Header.Set("MLP-Reservation", token)
@@ -338,4 +382,44 @@ func cutPrefix(s, prefix string) (string, bool) {
 // two-domain demo probes. Test support only.
 func PusherSigningKeyForTest(db *sql.DB) (string, ed25519.PrivateKey, error) {
 	return (&Pusher{DB: db}).signingKey(context.Background())
+}
+
+// baoCapable consults the receiving domain's capability advertisement.
+func (p *Pusher) baoCapable(ctx context.Context, domain string) bool {
+	if p.Caps == nil || domain == "" {
+		return false
+	}
+	for _, c := range p.Caps(ctx, domain) {
+		if c == "bao-stream/1" {
+			return true
+		}
+	}
+	return false
+}
+
+// encodeTemp materializes the Annex D.3 combined encoding of the raw
+// source into a temp file the push loop can seek like any source.
+func (p *Pusher) encodeTemp(src io.ReadSeeker, size int64) (*os.File, int64, error) {
+	if _, err := src.Seek(0, io.SeekStart); err != nil {
+		return nil, 0, err
+	}
+	content := make([]byte, size)
+	if _, err := io.ReadFull(src, content); err != nil {
+		return nil, 0, err
+	}
+	f, err := os.CreateTemp("", "mlp-bao-*")
+	if err != nil {
+		return nil, 0, err
+	}
+	if err := bao.Encode(f, content); err != nil {
+		f.Close()
+		os.Remove(f.Name())
+		return nil, 0, err
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		f.Close()
+		os.Remove(f.Name())
+		return nil, 0, err
+	}
+	return f, bao.EncodedSize(size), nil
 }

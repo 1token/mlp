@@ -251,7 +251,15 @@ func buildNode(cfg config) (*node, error) {
 	}
 
 	return &node{DB: db, SN: node0, BS: blob, API: api, mux: mux,
-		pusher: &bs.Pusher{DB: db, Client: pusherClient, Now: clock}}, nil
+		pusher: &bs.Pusher{DB: db, Client: pusherClient, Now: clock,
+			// §8.9 (M054): bao only toward domains advertising it.
+			Caps: func(ctx context.Context, domain string) []string {
+				doc, err := resolver.Resolve(ctx, domain)
+				if err != nil || doc == nil {
+					return nil
+				}
+				return doc.Capabilities
+			}}}, nil
 }
 
 // pushOnce drives every pending or interrupted outbound reservation
@@ -358,7 +366,8 @@ func domainDocument(db *sql.DB, domain string) ([]byte, error) {
 		})
 	}
 	return json.Marshal(map[string]any{
-		"domain": domain, "mlp": []string{"0.1"},
+		"capabilities": []string{"bao-stream/1"}, // §5.2, MEP-003: the reference receives mlp-bao
+		"domain":       domain, "mlp": []string{"0.1"},
 		"sn": "https://" + domain + "/sn", "keys": keys,
 	})
 }
