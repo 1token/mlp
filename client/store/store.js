@@ -13,10 +13,21 @@
  */
 
 /**
+ * @typedef {{ via: 'message' | 'media', name?: string, snippet: string }} SearchHit
+ */
+
+/**
+ * @typedef {{ message_id: number, thread_id: number, medialet_ca: string,
+ *   received_at: string, subject: string, matches: SearchHit[] }} SearchResult
+ */
+
+/**
  * @typedef {{ authenticated: boolean, mailboxId: number | null,
  *   inbox: { threads: ThreadRow[], loading: boolean, view: string },
  *   openThread: number | 'compose' | null,
  *   tab: 'inbox' | 'junk' | 'deliveries' | 'media',
+ *   searching: boolean,
+ *   search: { q: string, results: SearchResult[], loading: boolean },
  *   undo: { token: string, label: string } | null }} State
  */
 
@@ -30,18 +41,22 @@ class Store extends EventTarget {
       inbox: { threads: [], loading: false, view: 'inbox' },
       openThread: null,
       tab: 'inbox',
+      searching: false,
+      search: { q: '', results: [], loading: false },
       undo: null,
     };
   }
 
   /**
    * Patches a slice and notifies its subscribers.
-   * @param {'auth' | 'inbox' | 'nav' | 'undo'} slice
-   * @param {Partial<State> | Partial<State['inbox']>} patch
+   * @param {'auth' | 'inbox' | 'nav' | 'undo' | 'search'} slice
+   * @param {Partial<State> | Partial<State['inbox']> | Partial<State['search']>} patch
    */
   update(slice, patch) {
     if (slice === 'inbox') {
       this.state.inbox = { ...this.state.inbox, .../** @type {Partial<State['inbox']>} */ (patch) };
+    } else if (slice === 'search') {
+      this.state.search = { ...this.state.search, .../** @type {Partial<State['search']>} */ (patch) };
     } else {
       Object.assign(this.state, patch);
     }

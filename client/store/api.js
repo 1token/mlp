@@ -56,6 +56,13 @@ export const api = {
     call('GET', `/threads?view=${encodeURIComponent(view)}${cursor ? '&cursor=' + encodeURIComponent(cursor) : ''}`),
   /** @param {number} id */
   thread: (id) => call('GET', `/threads/${id}`),
+  /**
+   * S4.21 over the S4.19 endpoint (D-267 shape): grouped matches,
+   * newest first, bracket-marked snippets.
+   * @param {string} q @param {number} [limit] @param {number} [offset]
+   */
+  search: (q, limit, offset) =>
+    call('GET', `/search?q=${encodeURIComponent(q)}${limit ? '&limit=' + limit : ''}${offset ? '&offset=' + offset : ''}`),
   /** @param {number} id @param {'read'|'done'|'flag'} op @param {boolean} [value] */
   triage: (id, op, value) => call('POST', `/threads/${id}/${op}`, value === undefined ? {} : { value }),
   /** @param {string} token */

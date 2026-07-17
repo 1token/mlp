@@ -11,6 +11,7 @@ import { store } from '../store/store.js';
 import { api, ApiError } from '../store/api.js';
 import { connectLive } from '../store/live.js';
 import './mlp-inbox.js';
+import './mlp-search.js';
 import './mlp-thread.js';
 import './mlp-composer.js';
 import './mlp-deliveries.js';
@@ -63,16 +64,21 @@ export class MlpApp extends HTMLElement {
       <button data-tab="deliveries">Deliveries</button>
       <button data-tab="media">Media</button>
       <button id="compose">Compose</button>
+      <input id="q" type="search" placeholder="Search" aria-label="Search messages"
+        autocomplete="off" value="${store.state.search.q}">
     </nav>`;
     if (openThread === 'compose') {
       this.innerHTML = html`<main><p><button id="back">← Back</button></p><h1>Compose</h1><mlp-composer></mlp-composer></main>`;
     } else if (openThread !== null) {
       this.innerHTML = html`<main><p><button id="back">← Back</button></p><mlp-thread thread-id="${openThread}"></mlp-thread></main>`;
     } else {
-      const body = tab === 'deliveries' ? '<mlp-deliveries></mlp-deliveries>'
+      const body = store.state.searching ? '<mlp-search></mlp-search>'
+        : tab === 'deliveries' ? '<mlp-deliveries></mlp-deliveries>'
         : tab === 'media' ? '<mlp-media></mlp-media>'
         : '<mlp-inbox></mlp-inbox>';
-      this.innerHTML = '<main>' + nav + `<h1>${tab[0].toUpperCase()}${tab.slice(1)}</h1>` + body + '</main>';
+      const title = store.state.searching ? 'Search' : tab[0].toUpperCase() + tab.slice(1);
+      this.innerHTML = '<main>' + nav + `<h1>${title}</h1>` + body + '</main>';
+      this.bindSearch();
     }
     this.querySelector('#back')?.addEventListener('click', () =>
       store.update('nav', { openThread: null }));
@@ -103,6 +109,52 @@ export class MlpApp extends HTMLElement {
       this.bootstrap();
     } catch (e) {
       if (err) err.textContent = e instanceof ApiError ? e.message : 'sign-in failed';
+    }
+  }
+
+  /**
+   * S4.21 search wiring. Keystrokes touch only the `search` slice
+   * (the shell does not subscribe to it, so the input keeps focus);
+   * the empty <-> active transition alone goes through `nav`, which
+   * swaps the body once — then we restore focus into the fresh input.
+   */
+  bindSearch() {
+    const input = /** @type {HTMLInputElement | null} */ (this.querySelector('#q'));
+    if (!input) return;
+    if (this.refocusSearch) {
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+      this.refocusSearch = false;
+    }
+    input.addEventListener('input', () => this.onSearchInput(input.value));
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { input.value = ''; this.onSearchInput('', true); }
+      if (e.key === 'Enter') this.onSearchInput(input.value, true);
+    });
+  }
+
+  /** @param {string} q @param {boolean} [now] skip the debounce */
+  onSearchInput(q, now) {
+    clearTimeout(this.searchTimer);
+    const run = () => this.runSearch(q);
+    if (now) run(); else this.searchTimer = setTimeout(run, 250);
+  }
+
+  /** @param {string} q */
+  async runSearch(q) {
+    const active = q.trim() !== '';
+    store.update('search', active ? { q, loading: true } : { q: '', results: [], loading: false });
+    if (active !== store.state.searching) {
+      this.refocusSearch = active; // the swap recreates the input
+      store.update('nav', { searching: active, openThread: null });
+    }
+    if (!active) return;
+    try {
+      const data = await api.search(q);
+      if (store.state.search.q !== q) return; // a newer query superseded this one
+      store.update('search', { results: data.results ?? [], loading: false });
+    } catch (e) {
+      if (store.state.search.q === q) store.update('search', { results: [], loading: false });
     }
   }
 

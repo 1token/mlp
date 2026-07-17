@@ -31,5 +31,21 @@ check('null_undefined_empty',
 check('escapeHtml_covers_five',
   escapeHtml(`&<>"'`), '&amp;&lt;&gt;&quot;&#39;');
 
+
+// S4.21: snippetHtml — the D-267 bracket marks, safely.
+import { snippetHtml } from '../lib/html.js';
+check('snippet_marks',
+  snippetHtml('fotky zo [svadby] v meste'),
+  'fotky zo <mark>svadby</mark> v meste');
+check('snippet_escapes_inside_and_outside_marks',
+  snippetHtml('<b>x</b> [<i>y</i>] z'),
+  '&lt;b&gt;x&lt;/b&gt; <mark>&lt;i&gt;y&lt;/i&gt;</mark> z');
+check('snippet_stray_brackets_stay_literal',
+  snippetHtml('a ] b [ c'),
+  'a ] b [ c');
+check('snippet_empty_mark',
+  snippetHtml('x [] y'),
+  'x <mark></mark> y');
+
 if (failures) { console.error(`\nhtml.js: ${failures} failure(s)`); process.exit(1); }
 console.log('\nhtml.js: escaping discipline green');

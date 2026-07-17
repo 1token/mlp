@@ -84,3 +84,19 @@ export function reconcile(container, items, keyOf, create, update) {
   }
   for (const leftover of existing.values()) leftover.remove();
 }
+
+/**
+ * Server search snippets mark hits with square brackets (D-267,
+ * S4.21). Escape everything, then convert `[…]` pairs to <mark>.
+ * Literal brackets in content are a known cosmetic ambiguity of the
+ * D-267 choice — worst case a bracketed word highlights; nothing
+ * unescaped ever passes.
+ * @param {string} s
+ * @returns {string} safe HTML
+ */
+export function snippetHtml(s) {
+  return s.replace(/\[([^\[\]]*)\]|([^\[\]]+)|([\[\]])/g,
+    (_, marked, plain, stray) => marked !== undefined
+      ? '<mark>' + escapeHtml(marked) + '</mark>'
+      : escapeHtml(plain ?? stray));
+}
