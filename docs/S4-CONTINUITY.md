@@ -2,7 +2,7 @@
 
 > Purpose: resume implementation in a fresh working session with zero
 > context loss. Read this first; everything else is referenced from it.
-> Updated at the S4.19 close (2026-07-16) — node-local search; MEP-003/MEP-004 filed as Drafts.
+> Updated at the S4.20 close (2026-07-17) — MEP-003/004 accepted: core draft-03, TV-008, the profiles series.
 
 ## 1. Project in one paragraph
 
@@ -58,6 +58,7 @@ sequential D-number; changes to frozen artifacts travel only as MEPs.
 | S4.17 | The working-group exploder (editor-requested): `cmd/mlpd/scenarios_wg_test.go` — an IETF-style WG mailing list as an APPLICATION on MLP primitives (roster app-level, like mailman on SMTP; every action pure protocol), five domains: the list/moderator, three members, a cross-subscribed archive mirror. Seven phases: post → fan-out (per-domain Forward, D-04 preserved; authorship + CA byte-identical at every subscriber) → **heavy media never touches the list** (§9.3 delegation, the 5 MiB draft point-to-point from the author, `objectLive(lists)==false` asserted) → threading across the exploder (D-110: the reply joins the same topic everywhere because the CA is the identity) → moderation as the tier system (blocked troll `quarantined`, never inboxed, never exploded; release = approval) → the cross-subscription loop dying at one revolution (the boomerang provably arrives — two Delivery Records — and the automatic re-explosion refuses with `ErrForwardLoop`, D-51); every member exactly one copy | the scenario passes over real sockets, deterministic across 3 consecutive full-suite runs; the exploder posture is `automatic=true` — an exploder IS automation, and that honesty is what lets D-51 protect the federation |
 | S4.18 | Windows portability fix, editor-reported from a real Windows run: every upload's FINAL chunk answered 500 because `finalize` renamed the quarantine file while the handler still held its handle — routine on POSIX, a sharing violation on Windows. Fix in `bs.go`: close-before-promote (the bytes are already durable — the §8.4 checkpoint `Sync()` precedes it; the deferred Close double-closes harmlessly); the promote is now idempotent when the destination already exists (racing pushes of one URN: both verified against the URN's BLAKE3, identical by construction, the loser's partial is removed); `resetToZero`'s open-handle `os.Remove` documented as tidiness-not-correctness (both call sites `Truncate(0)` first). Audit of all five rename/remove sites: the other three are handle-free | full Linux suite green (9 pkgs; demo + 13 scenarios ×2); `CGO_ENABLED=0 GOOS=windows go build` of bs/sn/clientapi/core passes; the Windows test run itself is the editor's verification |
 | S4.19 | Node-local search (D-261): the tenth package `search/` — pluggable stdlib-only `Extractor` registry (DOCX/XLSX via zip+xml; minimal in-house PDF: Flate + Tj/TJ, kerning-gap word boundaries, printability filter dropping undecodable subset-font runs; plain text; 32 MiB in / 512 KiB out, D-264/D-267), `Indexer` with the per-URN `object_text` cache + FTS4 `search_fts` (unicode61 remove_diacritics — 'zilina' finds 'Žilina'; FTS4 because the pinned mattn build ships it tag-free where FTS5 needs a build tag, D-263); migration 0006; extraction at the `OnVerified` moment in `buildNode` + query-time `SyncMedialets`/`SyncObjects` self-heal (covers the sender-side gap: uploads verify before the send creates its promise rows) + `Reindex` (D-266); `GET /api/v1/search` — mailbox-scoped through the refs/messages joins, grouped per message with `via: message\|media`, bracket snippets, newest-first, paging, hostile queries sanitized to bare lowercased terms (D-265/D-267); OpenAPI 0.1-draft-02 + Client API draft-02 (one additive section, D-268); ER group + regeneration; the fourteenth scenario `TestScenarioSearchFindsTheShoot` | Milan finds the shoot by a word that exists ONLY inside the delivered PDF; 'nahlady' finds 'náhľady'; Petra's own sent copy self-heals into her index at first query; a miss is an honest empty page; **10 packages green**, three client gates + tsc (CI-pinned 5.5), MUST audit + all 7 vectors byte-identical, OpenAPI valid, ER regenerates byte-identically |
+| S4.20 | The acceptance session (editor-decided, D-271/D-274): core cut to **0.1-draft-03** (R-rename per the draft-01→draft-02 convention) — §5.2 `capabilities` with the `bao-stream/1` token, §8.9 verified-streaming push (encoded-offset tus semantics, per-group verification, `bao-verify-failed` as the source-wrong taxon detected at the first 16 KiB, completion ≡ the URN check), §3.4.1 `list` member (per-dispatch, hop-signed — the dispatch is the list's own act), §14 capability registry + reason code + `application/mlp-bao`, and **Annex D (normative)**: the mlp-bao encoding (16 KiB geometry with the D-273 rationale, chaining values, combined + slice forms, size formula); the **D-272 fetch-surface correction** recorded openly in MEP-003's editor decision — MLP has no cross-domain read (D-11 pure push), so slice consumption binds deployment read surfaces, informative per D-68/D-79; TV-008 (embedded reference BLAKE3 core because libraries expose no interior CVs, digest-pinned bytes in the family's size culture, double self-check per D-277); audit machinery per D-276 (annex-aware sections, 69/69 annotations remapped by exact text identity, six bao MUSTs OPEN-DEFERRED, corpus 69→75); `spec/profiles/mailing-list-draft-01.md` (identity + the `list` member, membership as plain Medialets, §3.4.2 `automatic=true` re-dispatch, one-revolution loop conduct, tier moderation never silent, §9.3 delegated media, the anti-leak security section); every draft-02 pointer updated (README, PRD, USER-STORIES, NLnet — four proposals, two full MEP cycles) | TV-008's generator self-checks pass (root equals the independent blake3; the corrupted slice fails at exactly group 2) and the vector regenerates byte-identically under the CI loop; the annotation remap spot-verified on shifted ids; 10 packages green, three client gates + tsc, all 8 generators byte-identical, audits idempotent |
 | S4.14 | Conformance hardening + operations + funding: the D-104 audit as a two-script instrument (`audit-musts.py` extracts the 69-line MUST corpus, `audit-annotate.py` refuses unannotated entries and emits `MUST-AUDIT.md`; CI regenerates both and fails on drift, so a spec edit forces an audit decision) — **50 of 64 testable requirements COVERED**, 2 partial, 7 open-client + 5 open-deferred, each gap decision-tied; new failing-input tests (`sn/must_test.go`: JSON-dialect refusals incl. floats/nulls/epoch/duplicate urns, unknown-member tolerance as a positive case, the §4.1 grammar battery, §9.2 interloper-source never contacted); a genuine grammar gap found and fixed at the root (`validRun` admitted `_` in domain labels against IDNA2008 LDH — underscore now rides `extra` for local atoms only, plus label hyphen-position rules); the D-139 GC-first class on `refs.ephemeral` (0001 had the column; auto-granted refs now carry it) with `SN.CollectGarbage` honoring the §10.5 invariants (pinned retains absolutely; atomic tombstone flip; only-unavailable immediately collectable; standard class untouched) wired hourly into mlpd; `docs/OPERATOR.md` (D-180) and `docs/NLNET-APPLICATION.md` (D-42, D1–D5 each mapped to committed artifacts, €38k shaped against the audit's own open items) | **the audit is the deliverable that makes every other claim checkable**: TestGCInvariants passes first run; TestNonChainSourceNeverContacted proves the §9.2 filter; the grammar battery caught a real hole; nine packages + three client gates + seven vectors + the audit reconcile green |
 | S4.13 | The two-domain demo (Stage 3 Closing §5) + the composer's file door: `cmd/mlpd` (one binary per domain — SN + BS + Client API + static client + guest page + push loop; demo mode via `-peer` through `discovery.NewDemoFetcher`, loudly logged); `TestTwoDomainDemo` walks every §5 bullet over real TCP sockets; D-139 auto-grant implemented as the `sn.AutoGrant` recipient-policy knob (spec default stays defer-all — TV-002 reproduces); Send now writes the correspondents ledger (`first_outbound_at`), unlocking §7.5 `have` disclosure; vendored pure-JS blake3 (`@noble/hashes`, no wasm, CSP intact) + `lib/mlet-urn.js` gated on the TV-001 media address (run-urn.js in CI); the composer's hash-first file door with tus resume; `demo/run.sh` + `demo/DEMO.md` (the on-camera script) | **all seven definition-of-done bullets pass programmatically**: strangers' preview auto-grants and renders alive while the master defers; the push killed after one 2 MiB chunk sits at `pushing`/2097152 and resumes to a byte-verified object; the correspondent's resend answers `have` and accepts instantly; the reply threads and sweeps; the guest claims and instantly has; three genuine gaps surfaced and fixed at the root (auto-grant unimplemented, correspondents never written, StripPrefix breaking @target-uri) |
 | S4.12 | Guest + claim (S3.6) and passkeys (S3.8/D-233): migration 0005 (pin_failures + WebAuthn tables over the 0001-provisioned guest_links/guest_downloads); guest links minted at Send for explicitly named guests (hash-stored tokens, per-draft 6-digit PINs for the sender's second channel, the D-153 notifier hook carrying the link only, 30-day expiry); sessionless guest endpoints with the D-155 five-failure lock; payload = the render form (one viewer, two hosts — views never recorded, downloads recorded per D-147); the claim (D-154): mailbox minted, the original SM re-dispatched through the REAL local ingest (self-domain verificationKey path via own_keys), session issued, link surviving, one claim per link; instant-have as the possession short-circuit heading handleAccept (offered→expected→available in one action — claims, same-domain sends, D-26 dedup alike); `webauthn/` dependency-free (strict fixed-shape CBOR, fmt "none", ES256 + Ed25519, single-use 5-min challenges, sign-count regressions logged); register/login endpoints; client guest.html + mlp-guest.js (second viewer host, PIN prompt, blob downloads, claim + navigator.credentials) | **the guest journey passes end to end** — PIN gate, lock, un-tracked views, tracked downloads, claim → thread in the new inbox → `{state:"available", instant:true}` with no bytes moving, the link surviving its claim, expiry at day 31; the passkey ceremonies pass with synthetic authenticators (challenge reuse and tampered assertions refuse); found and fixed the drafts dialect break (untagged ManifestEntry marshaled CamelCase against D-170 — now snake_case at the root) |
@@ -528,7 +529,39 @@ terminal (never retried), tier moderation visible to the sender and
 never a silent drop, heavy media delegated per §9.3 (the list SHOULD
 NOT take custody); the profile document itself is written on
 acceptance with `TestScenarioWorkingGroupExploder` as its reference
-implementation.
+implementation. · **D-271** MEP-003 accepted (2026-07-17) and
+applied as core draft-03. · **D-272** the fetch-surface correction,
+recorded in the MEP's editor decision rather than rewritten history:
+MEP-003's "verified fetch (§9)" named a surface that does not exist —
+MLP has no cross-domain read (transfer is pure push, D-11; §9
+delegation is "push to my BS") — so the capability and the verified
+PUSH path (§8.9) are normative core, the slice byte-format is
+normative in Annex D, and slice consumption binds the client-API and
+guest read surfaces (deployment territory, informative per
+D-68/D-79). · **D-273** the 16 KiB chunk group is frozen with its
+rationale recorded in Annex D.1: ~0.4 % overhead, first verifiable
+rejection at 16 KiB, exact division of the §8.6 segment grid (one
+16 MiB segment = 1,024 groups); Go-side throughput validation rides
+the implementation substage (D-269). · **D-274** MEP-004 accepted
+(2026-07-17): the `spec/profiles/` series, `mailing-list-draft-01`,
+and the §3.4.1 `list` member — per-dispatch and hop-signed because
+the dispatch is the list's own act; no core MUST, and no registry
+entry needed since §14 has no runtime member registry by design
+(D-100). · **D-275** session renumbering, amending D-268's label
+only: the acceptance session is S4.20; the client search UI becomes
+S4.21. · **D-276** audit maintenance posture: the corpus section
+regex recognizes Annex headers; on every spec edit annotations remap
+by exact text identity; the six new bao MUSTs are OPEN-DEFERRED
+against D-269's implementation substage. · **D-277** TV-008's
+standing shape: an embedded reference BLAKE3 core (libraries expose
+no interior chaining values), digest-pinned bytes rather than
+inlined content, and the double self-check (root equality with an
+independent BLAKE3; decode-verify through an independent walker,
+corrupted slice failing at its stated group) as a requirement of the
+vector, not a courtesy of the generator. · **D-278** the
+`list`-member emission and its scenario assertion are deferred to
+the implementation substage that wires them (profile §8): the wire
+member exists in draft-03; no server code changed in S4.20.
 
 ## 4. Environment recipe (sandbox)
 
@@ -568,7 +601,7 @@ conformance hardening + operator guide + NLnet.
 
 Per session: design/implementation presented with lettered judgment
 calls → Igor confirms explicitly → decisions frozen with sequential
-D-numbers (next free: **D-271**) → artifacts delivered as local
+D-numbers (next free: **D-279**) → artifacts delivered as local
 commits emitted as a `git format-patch` series against `origin/main`
 for Igor's review, `git am`, and push (D-196) → next-session pointer. Honesty rules: caught problems are
 surfaced, never patched silently; spec gaps go to the MEP queue;
@@ -582,7 +615,11 @@ conformance claims are machine-verified.
 3. ~~Publish the repository~~ — done: github.com/1token/mlp is live
    and is the continuation carrier (cloned directly in S4.3; D-40,
    D-196).
-4. Decide MEP-003 (bao verified streaming, D-269) and MEP-004 (the
-   mailing-list profile, D-270) — both filed 2026-07-16 as Drafts;
-   MEP-003 acceptance cuts core draft-03 + TV-008; MEP-004
-   acceptance produces `spec/profiles/mailing-list-draft-01.md`.
+4. ~~Decide MEP-003 and MEP-004~~ — done 2026-07-17: both accepted
+   (D-271, D-274); core at draft-03, TV-008 anchored, the profiles
+   series established with `mailing-list-draft-01`.
+5. The MEP-003/MEP-004 implementation substage (D-269, D-278): bao
+   push in the reference (the `lukechampine.com/blake3` swap),
+   `capabilities` parsing in discovery, the `list`-member emission +
+   its exploder-scenario assertion — the six OPEN-DEFERRED audit
+   rows (M031, M054, M055, M073–M075) are its acceptance list.

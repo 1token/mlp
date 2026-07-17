@@ -1,7 +1,7 @@
 # The MLP documentation map
 
 **Normative** (the protocol's truth):
-- `spec/MLP-Core-Specification-0.1-draft-02.md` — the wire, 17
+- `spec/MLP-Core-Specification-0.1-draft-03.md` — the wire, 17
   sections; every MUST audited (`conformance/MUST-AUDIT.md`, D-104)
 - `spec/meps/` — the change-control record (MEP-001/002: accepted)
 - `conformance/` — vectors TV-001–TV-007 with committed generators,

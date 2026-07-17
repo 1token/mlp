@@ -1,7 +1,7 @@
 # Product Requirements — the MLP reference implementation & flagship
 
 **Scope note.** The *protocol's* requirements document is the
-specification (`spec/MLP-Core-Specification-0.1-draft-02.md`) under
+specification (`spec/MLP-Core-Specification-0.1-draft-03.md`) under
 the D-104 audit; this PRD covers the *product* built on it — the
 reference server (`mlpd`), the web client, and the medialet.org
 flagship posture. Every requirement carries its decision anchor and,
@@ -86,7 +86,7 @@ custom domains) and holds no protocol privileges.
 | NFR-6 | **Resilience**: transfers resume from durable checkpoints with zero redundant bytes; crash-equivalent kill tested | §8.7, D-248 | `TestTwoDomainDemo` |
 | NFR-7 | **Simplicity of deployment**: one process, one data directory, SQLite, no external services | D-41 | OPERATOR.md; the demo boots two nodes in one script |
 | NFR-8 | **Client buildability**: no frameworks, no build step, no bundler; vendored dependencies are files | D-116, D-244 | `tsc --noEmit` + files-as-served |
-| NFR-9 | **Evolvability**: unknown-member tolerance tested as a MUST; MEP change control exercised through a full cycle | D-43, D-40 | `TestUnknownMemberTolerance`; draft-02 exists |
+| NFR-9 | **Evolvability**: unknown-member tolerance tested as a MUST; MEP change control exercised through a full cycle | D-43, D-40 | `TestUnknownMemberTolerance`; draft-03 exists — two full MEP cycles (001/002, 003/004) |
 | NFR-10 | **Auditability**: every MUST mapped to a test or a named gap; the audit drift-gated in CI | D-104, D-249 | `MUST-AUDIT.md` |
 
 ## 4. Explicit non-goals (v1)

@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Status** | Draft |
+| **Status** | **Accepted** |
 | **Type** | Additive (negotiated optional capability; no wire-version bump per D-101) |
-| **Filed** | 2026-07-16 · **Decided** | — |
+| **Filed** | 2026-07-16 · **Decided** | 2026-07-17 |
 | **Affects** | Spec §5 (Domain Document capability advertisement), §8 (transfer), §9 (fulfillment/fetch); one §14 registry token for the capability name |
 | **Origin** | D-259 — the S4.19 editor session on the post-draft-02 roadmap |
 
@@ -99,4 +99,21 @@ substage will add or swap that dependency.
 
 ## Editor decision
 
-*Pending.*
+Accepted 2026-07-17 (D-271), applied in core draft-03 with **one
+correction, recorded here rather than silently rewritten above**
+(D-272): item 2's "verified fetch (§9)" named a surface that does not
+exist — MLP has no cross-domain read; transfer is pure push (D-11)
+and §9 delegation is "please push to my BS". As integrated: the §5.2
+`capabilities` advertisement and the verified **push** path (§8.9)
+are normative core; the slice form is defined normatively in Annex D,
+and its consumption surfaces (ranged, seekable, verified reads) are
+the client-API and guest read surfaces — deployment territory,
+informative per D-68/D-79. The 16 KiB chunk-group pin is frozen with
+its rationale in Annex D.1 (D-273): ~0.4 % overhead, 16 KiB earliest
+rejection, and exact division of the §8.6 segment grid; Go-side
+throughput validation rides the implementation substage (D-269).
+TV-008 delivered with the acceptance: rule-generated object, CVs,
+combined and slice forms pinned by digest, and the corrupted slice's
+`bao-verify-failed` rejection point — the generator self-checks its
+tree against an independent BLAKE3 and decode-verifies its own
+slice.

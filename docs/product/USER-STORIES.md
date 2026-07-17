@@ -123,6 +123,6 @@ named gap (`conformance/MUST-AUDIT.md`, D-104). Ivan's node either
 reproduces the bytes or it does not — no interop archaeology.
 
 **I2. Extend without forking.** The MEP process has already run a
-full cycle: two proposals filed, decided, rolled into draft-02 with
+full cycle twice over: four proposals filed, decided, rolled into draft-02 and draft-03 with
 new vectors, old vectors untouched, old receivers unharmed
 (unknown-member tolerance is itself a tested MUST).

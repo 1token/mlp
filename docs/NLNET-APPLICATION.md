@@ -25,10 +25,10 @@ regenerable conformance suite are all published under free licenses
 
 ## The deliverables, now demonstrable
 
-**D1 — The specification.** `spec/MLP-Core-Specification-0.1-draft-02.md`:
+**D1 — The specification.** `spec/MLP-Core-Specification-0.1-draft-03.md`:
 17 sections, ~2,600 lines, 69 normative-requirement lines under a
 change-control process (MEP) that has already exercised a full cycle —
-two extension proposals filed, decided, and rolled into draft-02 with
+four extension proposals filed, decided, and rolled into draft-02 and draft-03 with
 conformance vectors. The requirement language is audited:
 `conformance/MUST-AUDIT.md` maps every MUST to a covering test or a
 named, decision-tied gap (50 of 64 testable requirements covered by

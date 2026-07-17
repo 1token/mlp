@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Status** | Draft |
+| **Status** | **Accepted** |
 | **Type** | Additive (companion document; zero core-spec text changes) |
-| **Filed** | 2026-07-16 · **Decided** | — |
+| **Filed** | 2026-07-16 · **Decided** | 2026-07-17 |
 | **Affects** | Establishes `spec/profiles/` (independently versioned); core §14 gains at most reserved metadata member names if the profile needs them |
 | **Origin** | D-260 — S4.17's finding that the working-group exploder required *nothing* from the protocol |
 
@@ -95,4 +95,14 @@ sockets in the scenario suite.
 
 ## Editor decision
 
-*Pending.*
+Accepted 2026-07-17 (D-274). Delivered with the acceptance:
+`spec/profiles/mailing-list-draft-01.md` (the series' first
+document) and the one core touch — the §3.4.1 `list` Envelope member
+(per-dispatch and hop-signed, because the dispatch is the list's own
+act; informational for core receivers, normative for claimants). No
+registry entry was needed: §14 has no runtime member registry by
+design — member additions are spec-governed via MEP (D-100), which
+this is. The `list`-member emission and its scenario assertion land
+with the implementation substage that wires it (profile §8);
+everything else the profile requires is already proven by
+`TestScenarioWorkingGroupExploder`.
