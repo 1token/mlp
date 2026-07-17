@@ -53,7 +53,7 @@ func TestForwardReproducesTV004Envelope(t *testing.T) {
 	s.NewEnvelopeID = func(time.Time) string { return fwdEnvID }
 
 	got, err := s.Forward(context.Background(), "origin.example", envID,
-		[]string{"carol@final.example"}, "novak@target.example", Delegated, true, "")
+		[]string{"carol@final.example"}, "novak@target.example", "", Delegated, true, "")
 	if err != nil {
 		t.Fatalf("forward: %v", err)
 	}
@@ -81,13 +81,13 @@ func TestLoopPrevention(t *testing.T) {
 	pretendOwn := *s
 	pretendOwn.Domain = "origin.example"
 	if _, err := pretendOwn.Forward(context.Background(), "origin.example", envID,
-		[]string{"x@final.example"}, "", Delegated, true, ""); err == nil {
+		[]string{"x@final.example"}, "", "", Delegated, true, ""); err == nil {
 		t.Fatal("automatic re-dispatch into the chain must be refused (D-51)")
 	}
 	// A deliberate user forward MAY proceed regardless.
 	pretendOwn.NewEnvelopeID = nil
 	if _, err := pretendOwn.Forward(context.Background(), "origin.example", envID,
-		[]string{"x@final.example"}, "petra@origin.example", Delegated, false, ""); err != nil {
+		[]string{"x@final.example"}, "petra@origin.example", "", Delegated, false, ""); err != nil {
 		t.Fatalf("deliberate forward must proceed: %v", err)
 	}
 }

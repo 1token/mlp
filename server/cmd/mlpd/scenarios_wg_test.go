@@ -42,6 +42,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -59,6 +60,7 @@ type exploder struct {
 	w       *world
 	domain  string   // the list's home domain
 	address string   // the list address (forwarded_by disclosure)
+	wire    [][]byte // canonical envelopes dispatched (per domain)
 	roster  []string // subscriber addresses
 }
 
@@ -80,10 +82,11 @@ func (e *exploder) explode(t *testing.T, origin, envID, author string) error {
 	for d, members := range byDomain {
 		e.w.advance(time.Second)
 		canon, err := listNode.SN.Forward(context.Background(), origin, envID,
-			members, e.address, sn.Delegated, true /* an exploder IS automation */, "")
+			members, e.address, e.address, sn.Delegated, true /* an exploder IS automation */, "")
 		if err != nil {
 			return err
 		}
+		e.wire = append(e.wire, canon)
 		resp, err := http.Post(e.w.node(d).base+"/dispatch",
 			"application/mlp-envelope+json", bytes.NewReader(canon))
 		if err != nil {
@@ -151,6 +154,29 @@ func TestScenarioWorkingGroupExploder(t *testing.T) {
 		w.node(d).DB.QueryRow(`SELECT author, content_address FROM medialets LIMIT 1`).Scan(&author, &ca)
 		if author != "petra@ietfa.demo" || ca != post.MedialetCA {
 			t.Fatalf("%s: authorship/identity through the exploder: %s / match=%v", d, author, ca == post.MedialetCA)
+		}
+	}
+	// D-278 (§3.4.1 `list`, MEP-004): every envelope the exploder
+	// dispatched carries the list identity alongside forwarded_by —
+	// asserted on the canonical wire bytes (the Delivery Record
+	// keeps structured fields, not raw JSON; receivers tolerated and
+	// delivered these envelopes, which the arrivals above prove).
+	if len(wg.wire) == 0 {
+		t.Fatal("the exploder must have dispatched envelopes")
+	}
+	for _, canon := range wg.wire {
+		var signed struct {
+			Envelope struct {
+				List        string `json:"list"`
+				ForwardedBy string `json:"forwarded_by"`
+			} `json:"envelope"`
+		}
+		if err := json.Unmarshal(canon, &signed); err != nil {
+			t.Fatalf("wire envelope: %v", err)
+		}
+		if signed.Envelope.List != "medialet-wg@lists.demo" || signed.Envelope.ForwardedBy != "medialet-wg@lists.demo" {
+			t.Fatalf("the wire must carry list + forwarded_by: %q / %q",
+				signed.Envelope.List, signed.Envelope.ForwardedBy)
 		}
 	}
 

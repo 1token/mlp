@@ -26,7 +26,7 @@ func forwardOverSocket(t *testing.T, w *world, holder *demoNode, origin, envID s
 	to []string, forwardedBy string, mode sn.ForwardMode, automatic bool, until string) *http.Response {
 	t.Helper()
 	w.advance(time.Second)
-	canon, err := holder.SN.Forward(context.Background(), origin, envID, to, forwardedBy, mode, automatic, until)
+	canon, err := holder.SN.Forward(context.Background(), origin, envID, to, forwardedBy, "", mode, automatic, until)
 	if err != nil {
 		t.Fatalf("Forward: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestScenarioForwardLoopPrevention(t *testing.T) {
 	// AUTOMATIC onward dispatch here is the mail loop — refused.
 	fwdOrigin, fwdEnvID := receivedEnvelopeID(t, n, out.MedialetCA)
 	_, err := n.SN.Forward(context.Background(), fwdOrigin, fwdEnvID,
-		[]string{"novak@target.demo"}, "", sn.Delegated, true /* automatic */, "")
+		[]string{"novak@target.demo"}, "", "", sn.Delegated, true /* automatic */, "")
 	if err == nil {
 		t.Fatal("an automatic re-dispatch at a chain member must be refused (D-51)")
 	}

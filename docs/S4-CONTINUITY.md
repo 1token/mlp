@@ -2,7 +2,7 @@
 
 > Purpose: resume implementation in a fresh working session with zero
 > context loss. Read this first; everything else is referenced from it.
-> Updated at the S4.21 close (2026-07-17) — the client search UI.
+> Updated at the S4.22 close (2026-07-17) — the bao/profile implementation: §8.9 live end to end.
 
 ## 1. Project in one paragraph
 
@@ -60,6 +60,7 @@ sequential D-number; changes to frozen artifacts travel only as MEPs.
 | S4.19 | Node-local search (D-261): the tenth package `search/` — pluggable stdlib-only `Extractor` registry (DOCX/XLSX via zip+xml; minimal in-house PDF: Flate + Tj/TJ, kerning-gap word boundaries, printability filter dropping undecodable subset-font runs; plain text; 32 MiB in / 512 KiB out, D-264/D-267), `Indexer` with the per-URN `object_text` cache + FTS4 `search_fts` (unicode61 remove_diacritics — 'zilina' finds 'Žilina'; FTS4 because the pinned mattn build ships it tag-free where FTS5 needs a build tag, D-263); migration 0006; extraction at the `OnVerified` moment in `buildNode` + query-time `SyncMedialets`/`SyncObjects` self-heal (covers the sender-side gap: uploads verify before the send creates its promise rows) + `Reindex` (D-266); `GET /api/v1/search` — mailbox-scoped through the refs/messages joins, grouped per message with `via: message\|media`, bracket snippets, newest-first, paging, hostile queries sanitized to bare lowercased terms (D-265/D-267); OpenAPI 0.1-draft-02 + Client API draft-02 (one additive section, D-268); ER group + regeneration; the fourteenth scenario `TestScenarioSearchFindsTheShoot` | Milan finds the shoot by a word that exists ONLY inside the delivered PDF; 'nahlady' finds 'náhľady'; Petra's own sent copy self-heals into her index at first query; a miss is an honest empty page; **10 packages green**, three client gates + tsc (CI-pinned 5.5), MUST audit + all 7 vectors byte-identical, OpenAPI valid, ER regenerates byte-identically |
 | S4.20 | The acceptance session (editor-decided, D-271/D-274): core cut to **0.1-draft-03** (R-rename per the draft-01→draft-02 convention) — §5.2 `capabilities` with the `bao-stream/1` token, §8.9 verified-streaming push (encoded-offset tus semantics, per-group verification, `bao-verify-failed` as the source-wrong taxon detected at the first 16 KiB, completion ≡ the URN check), §3.4.1 `list` member (per-dispatch, hop-signed — the dispatch is the list's own act), §14 capability registry + reason code + `application/mlp-bao`, and **Annex D (normative)**: the mlp-bao encoding (16 KiB geometry with the D-273 rationale, chaining values, combined + slice forms, size formula); the **D-272 fetch-surface correction** recorded openly in MEP-003's editor decision — MLP has no cross-domain read (D-11 pure push), so slice consumption binds deployment read surfaces, informative per D-68/D-79; TV-008 (embedded reference BLAKE3 core because libraries expose no interior CVs, digest-pinned bytes in the family's size culture, double self-check per D-277); audit machinery per D-276 (annex-aware sections, 69/69 annotations remapped by exact text identity, six bao MUSTs OPEN-DEFERRED, corpus 69→75); `spec/profiles/mailing-list-draft-01.md` (identity + the `list` member, membership as plain Medialets, §3.4.2 `automatic=true` re-dispatch, one-revolution loop conduct, tier moderation never silent, §9.3 delegated media, the anti-leak security section); every draft-02 pointer updated (README, PRD, USER-STORIES, NLnet — four proposals, two full MEP cycles) | TV-008's generator self-checks pass (root equals the independent blake3; the corrupted slice fails at exactly group 2) and the vector regenerates byte-identically under the CI loop; the annotation remap spot-verified on shifted ids; 10 packages green, three client gates + tsc, all 8 generators byte-identical, audits idempotent |
 | S4.21 | The client search UI over the S4.19 endpoint: a persistent nav search input with slice-isolated keystrokes (the shell subscribes to nav/auth only, so typing never loses focus; only the empty↔active transition re-renders, with explicit refocus into the recreated input), 250 ms debounce / Enter immediate / Escape clears, stale responses dropped against the live query (D-279); `<mlp-search>` as a pure renderer of the new `search` slice — keyed `reconcile` rows, `message` vs `media: name` chips, click opens the thread, results survive Back (D-280); `snippetHtml` in `lib/html.js`: escape-everything-then-mark over the D-267 brackets, the single greppable `unsafe()`, four new gate cases in `run-html.js` incl. XSS-through-snippet, the gate verdict moved to true EOF and proven by sabotage (D-281); no pagination UI, no stage-3 doc additions (D-282) | all four client gates green (run-html strengthened), tsc (CI-pinned 5.5) clean, 10 server packages green untouched |
+| S4.22 | The MEP-003/004 implementation (open action 5): the eleventh package `bao/` — embedded reference BLAKE3 core + Annex D encoder + incremental verifying decoder with hasher-twin `Clone()` checkpoints (D-283); migration 0007 (`reservations_in.encoding`, `reservations_out.target_domain`) with both sn grant inserts carrying the receiving domain; the §8.9 receiver as a patchCore weave (D-285): first-PATCH encoding binding, mid-push switch refused 415, encoded offsets with Head reporting `EncodedSize`, decoder checkpoints re-derived from the partial prefix (D-27 discipline), early 422 `bao-verify-failed` + reset-to-zero mid-copy, completion ≡ `Complete()` (the walk root-checks against the URN digest), decode-to-raw at finalize close-before-promote (D-257); the pusher's `Caps` hook + the adoption rule (D-286): offset>0 adopts the binding HEAD's Upload-Length implies, offset==0 follows capability preference, lazy encoded temp, encode failure = no state transition; discovery parses `capabilities` (M031); the reference DD advertises `bao-stream/1` unconditionally (D-284) so every cross-domain push in the suite runs mlp-bao; the kill test reworked capabilities-dark/restored, asserting the adoption rule; `Forward` gains the Address-validated hop-signed `list` param, the exploder discloses its identity, asserted on the dispatched wire (D-287/D-278); audit rows M031, M054, M055, M073–M075 → COVERED with named failing-input tests | bao/ passes TV-008 **byte-exactly first run** (Go↔Python interop; combined digest match) cross-checked against independent BLAKE3; corrupted stream fails at exactly group 2 with only groups 0–1 released; all 14 scenarios green **over mlp-bao transfer**; 11 packages, three client gates + tsc, 8 generators byte-identical, audits idempotent, ER regenerated with 0007 |
 | S4.14 | Conformance hardening + operations + funding: the D-104 audit as a two-script instrument (`audit-musts.py` extracts the 69-line MUST corpus, `audit-annotate.py` refuses unannotated entries and emits `MUST-AUDIT.md`; CI regenerates both and fails on drift, so a spec edit forces an audit decision) — **50 of 64 testable requirements COVERED**, 2 partial, 7 open-client + 5 open-deferred, each gap decision-tied; new failing-input tests (`sn/must_test.go`: JSON-dialect refusals incl. floats/nulls/epoch/duplicate urns, unknown-member tolerance as a positive case, the §4.1 grammar battery, §9.2 interloper-source never contacted); a genuine grammar gap found and fixed at the root (`validRun` admitted `_` in domain labels against IDNA2008 LDH — underscore now rides `extra` for local atoms only, plus label hyphen-position rules); the D-139 GC-first class on `refs.ephemeral` (0001 had the column; auto-granted refs now carry it) with `SN.CollectGarbage` honoring the §10.5 invariants (pinned retains absolutely; atomic tombstone flip; only-unavailable immediately collectable; standard class untouched) wired hourly into mlpd; `docs/OPERATOR.md` (D-180) and `docs/NLNET-APPLICATION.md` (D-42, D1–D5 each mapped to committed artifacts, €38k shaped against the audit's own open items) | **the audit is the deliverable that makes every other claim checkable**: TestGCInvariants passes first run; TestNonChainSourceNeverContacted proves the §9.2 filter; the grammar battery caught a real hole; nine packages + three client gates + seven vectors + the audit reconcile green |
 | S4.13 | The two-domain demo (Stage 3 Closing §5) + the composer's file door: `cmd/mlpd` (one binary per domain — SN + BS + Client API + static client + guest page + push loop; demo mode via `-peer` through `discovery.NewDemoFetcher`, loudly logged); `TestTwoDomainDemo` walks every §5 bullet over real TCP sockets; D-139 auto-grant implemented as the `sn.AutoGrant` recipient-policy knob (spec default stays defer-all — TV-002 reproduces); Send now writes the correspondents ledger (`first_outbound_at`), unlocking §7.5 `have` disclosure; vendored pure-JS blake3 (`@noble/hashes`, no wasm, CSP intact) + `lib/mlet-urn.js` gated on the TV-001 media address (run-urn.js in CI); the composer's hash-first file door with tus resume; `demo/run.sh` + `demo/DEMO.md` (the on-camera script) | **all seven definition-of-done bullets pass programmatically**: strangers' preview auto-grants and renders alive while the master defers; the push killed after one 2 MiB chunk sits at `pushing`/2097152 and resumes to a byte-verified object; the correspondent's resend answers `have` and accepts instantly; the reply threads and sweeps; the guest claims and instantly has; three genuine gaps surfaced and fixed at the root (auto-grant unimplemented, correspondents never written, StripPrefix breaking @target-uri) |
 | S4.12 | Guest + claim (S3.6) and passkeys (S3.8/D-233): migration 0005 (pin_failures + WebAuthn tables over the 0001-provisioned guest_links/guest_downloads); guest links minted at Send for explicitly named guests (hash-stored tokens, per-draft 6-digit PINs for the sender's second channel, the D-153 notifier hook carrying the link only, 30-day expiry); sessionless guest endpoints with the D-155 five-failure lock; payload = the render form (one viewer, two hosts — views never recorded, downloads recorded per D-147); the claim (D-154): mailbox minted, the original SM re-dispatched through the REAL local ingest (self-domain verificationKey path via own_keys), session issued, link surviving, one claim per link; instant-have as the possession short-circuit heading handleAccept (offered→expected→available in one action — claims, same-domain sends, D-26 dedup alike); `webauthn/` dependency-free (strict fixed-shape CBOR, fmt "none", ES256 + Ed25519, single-use 5-min challenges, sign-count regressions logged); register/login endpoints; client guest.html + mlp-guest.js (second viewer host, PIN prompt, blob downloads, claim + navigator.credentials) | **the guest journey passes end to end** — PIN gate, lock, un-tracked views, tracked downloads, claim → thread in the new inbox → `{state:"available", instant:true}` with no bytes moving, the link surviving its claim, expiry at day 31; the passkey ceremonies pass with synthetic authenticators (challenge reuse and tampered assertions refuse); found and fixed the drafts dialect break (untagged ManifestEntry marshaled CamelCase against D-170 — now snake_case at the root) |
@@ -577,7 +578,48 @@ convert D-267 bracket pairs to `<mark>`; the one greppable
 gains four cases and its verdict moves to true EOF (sabotage-proven).
 · **D-282** S4.21 scope: no pagination UI (offset paging joins the
 S3.11 backlog with the visual pass); stage-3 design docs stay
-historical — the ledger row carries the substage.
+historical — the ledger row carries the substage. · **D-283** the
+bao core is an embedded ~200-line reference BLAKE3 (compression +
+tree) in the new `bao/` package, NOT the lukechampine dependency
+D-269 anticipated: hash libraries expose no interior chaining values,
+TV-008 judges the core byte-exactly (the same posture as the vector
+generator's embedded Python core, D-277), zeebo stays for fast
+whole-object hashing, and production swaps the core, not the tree. ·
+**D-284** the reference Domain Document advertises `bao-stream/1`
+unconditionally — the reference implements §8.9 receive, so it says
+so — which upgrades every cross-domain push in the 14-scenario suite
+to mlp-bao (the strongest end-to-end proof); the raw path keeps
+coverage through bs unit tests and the client's LocalPatch uploads,
+raw by design. · **D-285** the §8.9 receiver is a weave through the
+one §8.4 transactional pipeline, not a parallel one: the first PATCH
+binds `reservations_in.encoding` (mid-push switching refused 415);
+offsets, limits, and Head's Upload-Length are encoded-stream bytes
+(`EncodedSize`); the decoder checkpoint re-derives from the partial's
+verified prefix exactly as the hasher does (D-27); a failing group
+422s `bao-verify-failed` with reset-to-zero mid-copy (the
+source-wrong taxon detected at 16 KiB); completion is `Complete()` —
+the walk verified the topmost node root-finalized against the URN's
+digest, so no separate comparison exists to skip; finalize decodes
+the verified partial to the raw object, re-verifying, with
+close-before-promote (D-257). · **D-286** the pusher adoption rule:
+on resume (offset > 0) the pusher adopts the encoding HEAD's
+Upload-Length implies — `EncodedSize(rawSize)` means bao-bound,
+`rawSize` means raw-bound — and only at offset 0 does capability
+preference choose; a crash-resumed push never switches encodings
+(the rule surfaced as a genuine bug via the kill test); the encoded
+stream materializes lazily, once, to a seekable temp file; encode
+failure returns without a state transition (the process-death
+analogue of a source read error); the kill test now runs its crash
+capabilities-dark (a truncated SOURCE under bao dies at encode time
+— the root node needs every group CV up front, so the mid-read death
+only exists on raw) and its resume capabilities-restored, asserting
+the adoption rule itself. · **D-287** the `list` member is emit-side
+only: `Forward` gains the Address-validated parameter inside the
+hop-signed envelope; receivers already tolerate and deliver it
+(D-43); Delivery Records deliberately keep structured fields rather
+than raw envelope JSON, so the scenario asserts on the canonical
+dispatched wire plus the proven arrivals — no retention machinery
+for an informational member.
 
 ## 4. Environment recipe (sandbox)
 
@@ -617,7 +659,7 @@ conformance hardening + operator guide + NLnet.
 
 Per session: design/implementation presented with lettered judgment
 calls → Igor confirms explicitly → decisions frozen with sequential
-D-numbers (next free: **D-283**) → artifacts delivered as local
+D-numbers (next free: **D-288**) → artifacts delivered as local
 commits emitted as a `git format-patch` series against `origin/main`
 for Igor's review, `git am`, and push (D-196) → next-session pointer. Honesty rules: caught problems are
 surfaced, never patched silently; spec gaps go to the MEP queue;
@@ -634,8 +676,7 @@ conformance claims are machine-verified.
 4. ~~Decide MEP-003 and MEP-004~~ — done 2026-07-17: both accepted
    (D-271, D-274); core at draft-03, TV-008 anchored, the profiles
    series established with `mailing-list-draft-01`.
-5. The MEP-003/MEP-004 implementation substage (D-269, D-278): bao
-   push in the reference (the `lukechampine.com/blake3` swap),
-   `capabilities` parsing in discovery, the `list`-member emission +
-   its exploder-scenario assertion — the six OPEN-DEFERRED audit
-   rows (M031, M054, M055, M073–M075) are its acceptance list.
+5. ~~The MEP-003/MEP-004 implementation substage~~ — done
+   2026-07-17 (S4.22): §8.9 live end to end, every scenario push over
+   mlp-bao, all six audit rows COVERED; the anticipated lukechampine
+   swap was replaced by the embedded reference core (D-283).

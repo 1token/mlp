@@ -59,7 +59,7 @@ A = {
   'M028': ('COVERED', 'discovery TestDomainBindingHardFails / TestVersionIntersectionHardFails / TestMissingRequiredMemberHardFails'),
   'M029': ('OPEN-DEFERRED', 'hint/HTTPS disagreement hard-fail: as M027, deferred with the hint machinery'),
   'M030': ('COVERED', 'discovery TestDomainBindingHardFails (the D-57 binding check)'),
-  'M031': ('OPEN-DEFERRED', 'the `capabilities` member (MEP-003) is not parsed by discovery yet — lands with the bao implementation substage (D-269 notes the dependency); the tolerance machinery itself is the M005 family'),
+  'M031': ('COVERED', 'discovery/discovery_test.go TestCapabilitiesParsing: unknown tokens carried unstripped, absent member empty, mistyped member hard-fails (S4.22)'),
   'M032': ('COVERED', 'discovery TestVerificationKeySemantics (windows); bs TestFreshnessWindowAndRoles for transfer keys'),
   'M033': ('OPEN-DEFERRED', '§5.3 hint grammar (v=MLP1): as M027'),
   'M034': ('OPEN-DEFERRED', '§5.3 hint url https: as M027'),
@@ -82,8 +82,8 @@ A = {
   'M051': ('COVERED', 'as M047 (the §8.2 restatement of D-72)'),
   'M052': ('COVERED', 'bs TestOffsetMismatchAndHashReset + TestDigestMismatchRollsBack (the PATCH N rules)'),
   'M053': ('OPEN-DEFERRED', 'segments (§8.6) are unimplemented in the reference BS (single-digest verification only); the length-equality MUST lands with segment support. Recorded as the largest deferred wire feature.'),
-  'M054': ('OPEN-DEFERRED', '§8.9 pusher-side advertisement gate; bao implementation substage (D-269)'),
-  'M055': ('OPEN-DEFERRED', '§8.9 receiver-side incremental rejection; TV-008 corrupted_slice is the prepared failing input; bao implementation substage (D-269)'),
+  'M054': ('COVERED', 'bs/bao_push_test.go TestBaoPusherGateStaysRawWithoutAdvertisement (failing side) + TestBaoPushEndToEnd (advertised side); the Caps hook is the gate (S4.22)'),
+  'M055': ('COVERED', 'bs/bao_push_test.go TestBaoPatchRejectsCorruptGroup: 422 bao-verify-failed + reset-to-zero + clean re-push promotes; bao/bao_test.go TestTV008CorruptedStream at the package level (S4.22)'),
   'M056': ('COVERED', 'sn/forward_test.go TestForwardReproducesTV004Envelope (complete chain carried)'),
   'M057': ('COVERED', 'forward tests: the root origin guaranteed present in sources'),
   'M058': ('COVERED', 'sn/must_test.go TestNonChainSourceNeverContacted (receiver side)'),
@@ -101,9 +101,9 @@ A = {
   'M070': ('COVERED', 'bs transactional verification fronts the store (TestTranscriptWalk, TestRestartRederivation); §14.3 restates §8'),
   'M071': ('META', 'the D-104 principle itself'),
   'M072': ('META', 'the D-104 principle, continued'),
-  'M073': ('OPEN-DEFERRED', 'Annex D geometry; TV-008 pins it byte-exactly (generator self-checks); Go emitter pending (D-269)'),
-  'M074': ('OPEN-DEFERRED', 'Annex D root==URN; enforced today for the vector emitter by TV-008 self-check (root equals the independent blake3 of the content); implementation-side test pending (D-269)'),
-  'M075': ('OPEN-DEFERRED', 'Annex D no-release-before-verify; the TV-008 corrupted_slice expectation states it; implementation-side test pending (D-269)'),
+  'M073': ('COVERED', 'bao/bao_test.go TestTV008Encode: byte-exact combined form against the vector (Go↔Python interop), EncodedSize formula pinned (S4.22)'),
+  'M074': ('COVERED', 'bao/bao_test.go TestTV008Encode: reference-core root equals independent BLAKE3 (zeebo) equals the vector; the decoder walk root-checks against the URN digest structurally (S4.22)'),
+  'M075': ('COVERED', 'bao/bao_test.go TestTV008CorruptedStream: exactly groups 0-1 released before the group-2 failure; the Groups sink sees only post-verification bytes by construction (S4.22)'),
 }
 
 def main():

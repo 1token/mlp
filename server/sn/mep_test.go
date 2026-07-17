@@ -62,7 +62,7 @@ func TestForwardCustodyUntilReproducesTV006(t *testing.T) {
 	s.NewEnvelopeID = func(time.Time) string { return tv006EnvelopeID(t) }
 
 	got, err := s.Forward(context.Background(), "origin.example", envID,
-		[]string{"carol@final.example"}, "novak@target.example", Custody, false,
+		[]string{"carol@final.example"}, "novak@target.example", "", Custody, false,
 		"2026-09-01T00:00:00Z")
 	if err != nil {
 		t.Fatalf("custody forward: %v", err)
@@ -137,7 +137,7 @@ func TestSourceHonorsOwnDeclaredUntil(t *testing.T) {
 	target := custodyTargetSN(t, &targetClock)
 	target.NewEnvelopeID = func(time.Time) string { return tv006EnvelopeID(t) }
 	forwarded, err := target.Forward(context.Background(), "origin.example", envID,
-		[]string{"carol@final.example"}, "novak@target.example", Custody, false,
+		[]string{"carol@final.example"}, "novak@target.example", "", Custody, false,
 		"2026-09-01T00:00:00Z")
 	if err != nil {
 		t.Fatal(err)

@@ -134,7 +134,12 @@ func (re *receivedEnvelope) chainMember(domain string) bool {
 // fulfillment_sources entry — the forwarder's separately-attributed
 // promise, never touching the author's Manifest. Ignored for
 // Delegated forwards (a delegator makes no custody promise).
-func (s *SN) Forward(ctx context.Context, origin, envelopeID string, envelopeTo []string, forwardedBy string, mode ForwardMode, automatic bool, until string) ([]byte, error) {
+// list, when non-empty, is the §3.4.1 `list` member (MEP-004,
+// draft-03): the mailing-list identity a re-dispatching list server
+// discloses alongside forwarded_by. Emit-side only — receivers
+// tolerate and carry it (D-43), applications read it for filtering
+// and threading.
+func (s *SN) Forward(ctx context.Context, origin, envelopeID string, envelopeTo []string, forwardedBy string, list string, mode ForwardMode, automatic bool, until string) ([]byte, error) {
 	now := s.now()
 	re, err := s.loadReceived(ctx, origin, envelopeID)
 	if err != nil {
@@ -199,6 +204,12 @@ func (s *SN) Forward(ctx context.Context, origin, envelopeID string, envelopeTo 
 	}
 	if forwardedBy != "" {
 		envelope["forwarded_by"] = forwardedBy
+		if list != "" {
+			if _, _, err := ParseAddress(list); err != nil {
+				return nil, fmt.Errorf("mlp/sn: list is not an Address (§3.4.1): %w", err)
+			}
+			envelope["list"] = list
+		}
 	}
 
 	kid, priv, err := s.signingKey(ctx, now)
