@@ -1,0 +1,66 @@
+{
+  "vector": "TV-008",
+  "title": "The application/mlp-bao encoding (MEP-003, Annex D)",
+  "spec": "MLP/0.1 draft-03, Annex D; §8.9",
+  "chunk_group_bytes": 16384,
+  "content": {
+    "length": 50152,
+    "rule": "byte[i] = (i*7 + 3) mod 256",
+    "urn": "urn:mlet:bdyqecbpijo4zopitr6vhsdhzlvbzbjfi7kjfmbaemv7fhoeo5bhmsui",
+    "blake3_hex": "4105e84bb9973d138faa790cf95d4390a4a8fa92560404657e53b88ee84ec951"
+  },
+  "group_cvs_hex": [
+    "12dd732ca755bc91f689edbf9df81841de76147baf23e3832502224f0f0ce5d0",
+    "1411d79958a41357cd59d9ea6f93e6168c97914d3bb4bf1918fd9e409250fcf6",
+    "caac2fed4d6d39c171225cfabafa30047e05a947ec89d23097c9085e5cfee5dd",
+    "7956ce3540a997f654aba45d0b107f079cbc5ebdc948e3720d6101d0f50c0fbc"
+  ],
+  "parent_nodes": [
+    {
+      "pre_order_index": 0,
+      "covers_groups": "0-3",
+      "node_hex": "419eaf2bb2764708e9e841d90d87d37277a83b520787f05a86835c1682af2efbfb9abf47a52e47c17b11b80c103512669eaa93dfc134a7e86efae68464f5111c",
+      "cv_hex": "4105e84bb9973d138faa790cf95d4390a4a8fa92560404657e53b88ee84ec951"
+    },
+    {
+      "pre_order_index": 1,
+      "covers_groups": "0-1",
+      "node_hex": "12dd732ca755bc91f689edbf9df81841de76147baf23e3832502224f0f0ce5d01411d79958a41357cd59d9ea6f93e6168c97914d3bb4bf1918fd9e409250fcf6",
+      "cv_hex": "419eaf2bb2764708e9e841d90d87d37277a83b520787f05a86835c1682af2efb"
+    },
+    {
+      "pre_order_index": 2,
+      "covers_groups": "2-3",
+      "node_hex": "caac2fed4d6d39c171225cfabafa30047e05a947ec89d23097c9085e5cfee5dd7956ce3540a997f654aba45d0b107f079cbc5ebdc948e3720d6101d0f50c0fbc",
+      "cv_hex": "fb9abf47a52e47c17b11b80c103512669eaa93dfc134a7e86efae68464f5111c"
+    }
+  ],
+  "combined": {
+    "encoded_length": 50352,
+    "layout": "8-byte LE content length, then pre-order: parent nodes (64 B) and group bytes",
+    "blake3_hex": "75b97ce984211da909a1eaf11a77e01a9e8338d7b2c38488e0cef302f222ffb0"
+  },
+  "slice": {
+    "offset": 32384,
+    "length": 2000,
+    "groups": [
+      1,
+      2
+    ],
+    "encoded_length": 32968,
+    "layout": "len(8) | root node(64) | left node(64) | group-1 bytes(16384) | right node(64) | group-2 bytes(16384)",
+    "blake3_hex": "9ced77a8f0b238a316bd0469eaa6ad25adb6b477c408b3635b4ab3ac521038a8"
+  },
+  "corrupted_slice": {
+    "base": "slice",
+    "xor": {
+      "offset": 16684,
+      "mask": 1
+    },
+    "expect": {
+      "code": "bao-verify-failed",
+      "failing_group": 2,
+      "note": "every byte before the failing group verified and may have been released; nothing of group 2 may be (Annex D.3)"
+    }
+  }
+}
